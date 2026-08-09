@@ -1,0 +1,88 @@
+erDiagram
+    ENGINEERS {
+        integer id PK
+        text name
+        text role
+        text email UK
+        text access_code UK
+        boolean active
+    }
+
+    REPOSITORIES {
+        integer id PK
+        text name UK
+        text description
+        text owner_team
+    }
+
+    PULL_REQUESTS {
+        integer id PK
+        integer repository_id FK
+        text title
+        text description
+        integer author_id FK
+        text status
+        integer reviewer_id FK
+        datetime created_at
+    }
+
+    ENVIRONMENTS {
+        integer id PK
+        text name
+        integer repository_id FK
+    }
+
+    DEPLOYMENTS {
+        integer id PK
+        integer repository_id FK
+        integer environment_id FK
+        integer deployed_by FK
+        integer pull_request_id FK
+        text status
+        datetime created_at
+        text notes
+    }
+
+    SECURITY_SCANS {
+        integer id PK
+        integer pull_request_id FK
+        text status
+        text scan_type
+        datetime created_at
+    }
+
+    FEATURE_FLAGS {
+        integer id PK
+        integer repository_id FK
+        integer environment_id FK
+        text name
+        boolean enabled
+    }
+
+    INCIDENTS {
+        integer id PK
+        integer deployment_id FK
+        text title
+        text severity
+        text status
+        datetime created_at
+        datetime resolved_at
+    }
+
+    REPOSITORIES ||--o{ PULL_REQUESTS : "has"
+    ENGINEERS ||--o{ PULL_REQUESTS : "authored by"
+    ENGINEERS ||--o{ PULL_REQUESTS : "reviewed by"
+
+    REPOSITORIES ||--o{ ENVIRONMENTS : "has"
+
+    REPOSITORIES ||--o{ DEPLOYMENTS : "deployed for"
+    ENVIRONMENTS ||--o{ DEPLOYMENTS : "target of"
+    ENGINEERS ||--o{ DEPLOYMENTS : "deployed by"
+    PULL_REQUESTS ||--o{ DEPLOYMENTS : "ships"
+
+    PULL_REQUESTS ||--o{ SECURITY_SCANS : "scanned by"
+
+    REPOSITORIES ||--o{ FEATURE_FLAGS : "defines"
+    ENVIRONMENTS ||--o{ FEATURE_FLAGS : "scoped to"
+
+    DEPLOYMENTS ||--o{ INCIDENTS : "may cause"
