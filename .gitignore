@@ -1,0 +1,32 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables / secrets — never commit an API key or DB credential
+.env
+.env.*
+!.env.example
+
+# The built database is generated from db/schema.sql + db/seed.sql — do not
+# commit the binary artifact, only the SQL that produces it.
+db/coderift.db
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
