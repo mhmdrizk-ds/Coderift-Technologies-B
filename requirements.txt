@@ -1,0 +1,11 @@
+# Standard library covers the stdio server, the demo agent, and schema
+# validation entirely (see mcp_server/validate.py's docstring for why
+# validation is hand-rolled instead of depending on the `jsonschema`
+# package). These two are only needed for the Streamable HTTP transport.
+fastapi>=0.110
+uvicorn>=0.29
+
+# Optional: agent/sampling.py calls the Google Gemini API directly over
+# urllib (stdlib) if GOOGLE_API_KEY/GEMINI_API_KEY is set, so no SDK
+# package is required for that either — it falls back to a deterministic
+# offline rule engine when no key is configured.
