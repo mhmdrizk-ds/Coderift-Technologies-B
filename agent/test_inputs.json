@@ -2,12 +2,18 @@
   "scenarios": {
     "capability_negotiation_full": {
       "description": "Full client (elicitation+sampling declared): confirm server capabilities before relying on them, browse resources/prompts pre-auth.",
-      "concerns": ["capability_negotiation", "resources", "prompts"],
+      "concerns": [
+        "capability_negotiation",
+        "resources",
+        "prompts"
+      ],
       "deployment_id": 2
     },
     "capability_negotiation_read_only": {
       "description": "Read-only client (no elicitation/sampling declared): deploy_to_production and draft_incident_summary must stay hidden from tools/list even for a senior engineer; check_deployment_status is the mandated fallback; calling deploy_to_production directly anyway is rejected cleanly with ERR_CAPABILITY_UNSUPPORTED.",
-      "concerns": ["capability_negotiation"],
+      "concerns": [
+        "capability_negotiation"
+      ],
       "senior_access_code": "ENG-SEN-01",
       "fallback_repository_name": "payments-service",
       "fallback_environment_name": "staging",
@@ -16,8 +22,11 @@
       "deploy_pull_request_id": 2
     },
     "defensive_and_authorization": {
-      "description": "Missing required field, disallowed extra field, an unauthenticated write, an unauthorized (junior) write, and an inactive engineer's access code — the server must reject all five.",
-      "concerns": ["defensive_tool_design", "authorization"],
+      "description": "Missing required field, disallowed extra field, an unauthenticated write, an unauthorized (junior) write, and an inactive engineer's access code \u2014 the server must reject all five.",
+      "concerns": [
+        "defensive_tool_design",
+        "authorization"
+      ],
       "bad_call_missing_field": {
         "tool": "get_pull_request",
         "arguments": {}
@@ -45,14 +54,18 @@
       "inactive_access_code": "ENG-SEN-99"
     },
     "notifications_on_promotion": {
-      "description": "Authenticate as junior (read-only tools + run_pre_deploy_checks appear), then re-authenticate as senior on the SAME connection (write tools + list_feature_flags appear) — tools/list_changed fires both times, no reconnect.",
-      "concerns": ["notifications"],
+      "description": "Authenticate as junior (read-only tools + run_pre_deploy_checks appear), then re-authenticate as senior on the SAME connection (write tools + list_feature_flags appear) \u2014 tools/list_changed fires both times, no reconnect.",
+      "concerns": [
+        "notifications"
+      ],
       "junior_access_code": "ENG-JUN-01",
       "senior_access_code": "ENG-SEN-01"
     },
     "uncontrolled_deploy": {
-      "description": "PR 1 is Approved with a Passed scan, deployed to staging — completes immediately, no elicitation.",
-      "concerns": ["defensive_tool_design"],
+      "description": "PR 1 is Approved with a Passed scan, deployed to staging \u2014 completes immediately, no elicitation.",
+      "concerns": [
+        "defensive_tool_design"
+      ],
       "senior_access_code": "ENG-SEN-01",
       "repository_name": "payments-service",
       "environment_name": "staging",
@@ -60,19 +73,25 @@
     },
     "controlled_deploy_scan_not_passed": {
       "description": "PR 2 is Approved but its latest scan is Failed; deploying to production triggers elicitation under rule (a). The engineer accepts, so the deploy proceeds with a recorded confirmation note.",
-      "concerns": ["elicitation"],
+      "concerns": [
+        "elicitation"
+      ],
       "senior_access_code": "ENG-SEN-02",
       "repository_name": "checkout-web",
       "environment_name": "production",
       "pull_request_id": 2,
       "elicitation_response": {
         "action": "accept",
-        "content": { "confirm": true }
+        "content": {
+          "confirm": true
+        }
       }
     },
     "controlled_deploy_unreviewed_declined": {
       "description": "PR 3 is still Open (not reviewed); deploying it anywhere triggers elicitation under rule (b), regardless of environment. This time the engineer declines, so no deployment is created.",
-      "concerns": ["elicitation"],
+      "concerns": [
+        "elicitation"
+      ],
       "lead_access_code": "ENG-LEAD-01",
       "repository_name": "billing-worker",
       "environment_name": "staging",
@@ -83,24 +102,73 @@
     },
     "progress_pre_deploy_checks": {
       "description": "run_pre_deploy_checks walks unit tests, integration tests, then a fresh security scan for PR 3, reporting progress after each stage instead of one blocking response.",
-      "concerns": ["progress_tracking"],
+      "concerns": [
+        "progress_tracking"
+      ],
       "junior_access_code": "ENG-JUN-01",
       "pull_request_id": 3
     },
     "sampling_incident_summary": {
       "description": "draft_incident_summary asks the CLIENT's own model to draft a plain-language summary of the seeded critical incident via sampling/createMessage.",
-      "concerns": ["sampling"],
+      "concerns": [
+        "sampling"
+      ],
       "lead_access_code": "ENG-LEAD-01",
       "incident_id": 1
     },
     "merge_and_rollback": {
       "description": "merge_pull_request succeeds for an Approved+Passed PR and is refused for a still-Open one; rollback_deployment succeeds once and is refused on a second attempt against the same now-RolledBack deployment.",
-      "concerns": ["defensive_tool_design", "authorization"],
+      "concerns": [
+        "defensive_tool_design",
+        "authorization"
+      ],
       "senior_access_code": "ENG-SEN-01",
       "mergeable_pull_request_id": 1,
       "unreviewed_pull_request_id": 3,
       "rollback_deployment_id": 2,
       "rollback_reason": "Elevated error rate observed in payments-service staging after this deploy; rolling back pending investigation."
+    },
+    "rag_policy_questions": {
+      "description": "Ask policy questions via naive/hybrid/agentic RAG, each verified by Self-RAG before being trusted.",
+      "concerns": [
+        "rag",
+        "self_rag"
+      ],
+      "senior_access_code": "ENG-SEN-01",
+      "questions": [
+        {
+          "strategy": "naive",
+          "query": "What is the required security scan status before deploying to production?",
+          "policy_name": "production_deployment"
+        },
+        {
+          "strategy": "hybrid",
+          "query": "What is the SLA for responding to a critical-severity incident?",
+          "policy_name": "incident_response"
+        },
+        {
+          "strategy": "agentic",
+          "query": "For a repository with 3 consecutive failed deployments and an active critical incident, what is the complete required response?"
+        }
+      ]
+    },
+    "memory_recall_in_session": {
+      "description": "Establish a fact about billing-worker through real tool calls within a session, force consolidation, then recall it \u2014 nothing known before, something known (and Self-RAG verified) after.",
+      "concerns": [
+        "memory"
+      ],
+      "senior_access_code": "ENG-SEN-01",
+      "topic": "billing-worker",
+      "status_checks": [
+        [
+          "billing-worker",
+          "production"
+        ],
+        [
+          "billing-worker",
+          "staging"
+        ]
+      ]
     }
   }
 }

@@ -328,6 +328,62 @@ def scenario_merge_and_rollback(session, data):
         print(f"  rejected as expected: {exc}")
 
 
+# ---------------------------------------------------------------------------
+# 11. RAG policy questions — naive/hybrid/agentic, each Self-RAG verified
+# ---------------------------------------------------------------------------
+def scenario_rag_policy_questions(session, data):
+    _header("SCENARIO 11: RAG Policy Questions (naive / hybrid / agentic, Self-RAG verified)")
+    session.authenticate(data["senior_access_code"])
+
+    for item in data["questions"]:
+        print(f"\n== [{item['strategy']}] {item['query']} ==")
+        result = session.ask_policy_question(
+            item["query"], strategy=item["strategy"], policy_name=item.get("policy_name")
+        )
+        print(f"  answer: {result['answer'][:220]}")
+        sr = result["self_rag"]
+        print(f"  self-rag: relevant={sr['relevance']['relevant']} "
+              f"supported={sr['support']['supported']} "
+              f"final_status={sr.get('final_status')}")
+
+
+# ---------------------------------------------------------------------------
+# 12. Memory recall within a live session — nothing known, then established,
+#     then recalled and Self-RAG verified. Cross-session persistence itself
+#     is demonstrated separately in demo/cross_session_memory_demo.py,
+#     which runs as two genuinely separate Python processes.
+# ---------------------------------------------------------------------------
+def scenario_memory_recall_in_session(session, data):
+    _header("SCENARIO 12: Memory recall within a session (buffer -> router -> episodic)")
+    session.authenticate(data["senior_access_code"])
+
+    print(f"\n== recall({data['topic']!r}) before establishing anything — expect nothing known ==")
+    before = session.recall(data["topic"])
+    assert before["recalled"] is None, "expected no prior knowledge of this topic"
+
+    print(f"\n== establishing the fact through real tool calls ==")
+    for repository_name, environment_name in data["status_checks"]:
+        session.call_tool(
+            "check_deployment_status",
+            {"repository_name": repository_name, "environment_name": environment_name},
+        )
+    session.call_tool("list_active_incidents", {})
+
+    # A real session's buffer overflows over dozens of turns (see
+    # context_eval/ for exactly that failure mode at scale); here we force
+    # a consolidation pass directly so this short scenario demonstrates the
+    # same router -> episodic -> semantic pipeline without needing 50+ calls.
+    session.run_consolidation()
+
+    print(f"\n== recall({data['topic']!r}) after establishing it ==")
+    after = session.recall(data["topic"])
+    if after["recalled"] is not None:
+        print(f"  recalled: {after['recalled']['statements'][:2]}")
+        print(f"  self-rag passed={after['verification']['passed']}")
+    else:
+        print("  still nothing known — see memory/router.py's keyword list for what promotes")
+
+
 SCENARIOS = {
     "capability_negotiation_full": scenario_capability_negotiation_full,
     "capability_negotiation_read_only": scenario_capability_negotiation_read_only,
@@ -339,6 +395,8 @@ SCENARIOS = {
     "progress_pre_deploy_checks": scenario_progress_pre_deploy_checks,
     "sampling_incident_summary": scenario_sampling_incident_summary,
     "merge_and_rollback": scenario_merge_and_rollback,
+    "rag_policy_questions": scenario_rag_policy_questions,
+    "memory_recall_in_session": scenario_memory_recall_in_session,
 }
 
 # Read-only-client scenarios use capability_profile="read_only"; every other
@@ -349,7 +407,7 @@ READ_ONLY_SCENARIOS = {"capability_negotiation_read_only"}
 # Fixed run order for `--all` — capability negotiation and read-only paths
 # first, then defensive/notifications groundwork, then the three deploy
 # outcomes (uncontrolled / elicit+accept / elicit+decline), then the
-# remaining concerns.
+# remaining concerns, then Session 3's memory + RAG additions.
 SCENARIO_ORDER = [
     "capability_negotiation_full",
     "capability_negotiation_read_only",
@@ -361,4 +419,6 @@ SCENARIO_ORDER = [
     "progress_pre_deploy_checks",
     "sampling_incident_summary",
     "merge_and_rollback",
+    "rag_policy_questions",
+    "memory_recall_in_session",
 ]

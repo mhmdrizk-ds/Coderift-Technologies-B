@@ -58,8 +58,21 @@ python -m agent.client --all --interactive # answer elicitation prompts live ins
 | 8 | `progress_pre_deploy_checks` | Progress tracking |
 | 9 | `sampling_incident_summary` | Sampling |
 | 10 | `merge_and_rollback` | Defensive tool design (second flavor) |
+| 11 | `rag_policy_questions` | RAG (naive/hybrid/agentic) + Self-RAG verification |
+| 12 | `memory_recall_in_session` | Memory (buffer -> router -> episodic -> semantic, in one session) |
 
 Every scenario in this table uses the `full` capability profile except
 #2, which is deliberately built with `read_only` (see
 `READ_ONLY_SCENARIOS` in `scenarios.py`) to prove the "client without
 elicitation support" path actually works, not just the happy path.
+
+Scenario 12 uses a small `memory_buffer_capacity=3` (see `client.py`'s
+`build_session()`) so its handful of tool calls actually overflow the
+buffer and reach the router within one short scenario — a real session
+uses the default capacity of 50 and overflows naturally over dozens of
+turns. Scenario 12 demonstrates the pipeline *within* one session;
+**cross-session persistence** (a completely separate process picking up
+what a prior session consolidated) is demonstrated separately by
+`demo/cross_session_memory_demo.py`, which is the flagship proof this lab
+extension exists to deliver — see the top-level README's Memory & RAG
+section.
