@@ -1,0 +1,211 @@
+{
+  "description": "40-turn Coderift Technologies agent session. Turn 3 contains the critical detail: billing-worker has had 3 consecutive failed deployments and is flagged as deployment-unstable. Turns 4-39 contain realistic Coderift tool output noise (security scan JSONs, PR status checks, deployment history, feature flag lists). Turn 40 asks the agent to assess whether billing-worker is safe to deploy to. The answer must be NO \u2014 the critical detail from turn 3 must survive.",
+  "grading_keywords": [
+    "consecutive failed",
+    "unstable",
+    "critical incident",
+    "billing-worker"
+  ],
+  "messages": [
+    {
+      "turn": 1,
+      "role": "system",
+      "content": "You are a Coderift Technologies deployment assistant. Help engineers make safe deployment decisions. Always check deployment history and incident status before approving a production deploy."
+    },
+    {
+      "turn": 2,
+      "role": "user",
+      "content": "I need to check the status of our repositories before the afternoon deployment window."
+    },
+    {
+      "turn": 3,
+      "role": "assistant",
+      "content": "I checked the deployment history for billing-worker. CRITICAL FINDING: billing-worker has had 3 consecutive failed deployments in the last 14 days. The repository is flagged as deployment-unstable. There is also an active critical incident (#1) linked to deployment #1. The system should not accept new production deployments to billing-worker until the root cause is resolved and the incident is closed."
+    },
+    {
+      "turn": 4,
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 1, \"title\": \"Add retry logic to payment webhook\", \"status\": \"Approved\", \"repository\": \"payments-service\", \"security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-28T10:00:00\"}}}"
+    },
+    {
+      "turn": 5,
+      "role": "assistant",
+      "content": "PR #1 for payments-service looks good \u2014 Approved status and Passed SAST scan. Eligible for deployment."
+    },
+    {
+      "turn": 6,
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"payments-service\", \"environment\": \"staging\", \"latest_deployment\": {\"id\": 2, \"status\": \"Succeeded\", \"created_at\": \"2026-07-29T09:00:00\", \"deployed_by\": \"Marcus Webb\"}}}"
+    },
+    {
+      "turn": 7,
+      "role": "user",
+      "content": "What about the security scan status for PR #2 on checkout-web?"
+    },
+    {
+      "turn": 8,
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 2, \"title\": \"Refactor checkout price calculation\", \"status\": \"Approved\", \"repository\": \"checkout-web\", \"security_scan\": {\"status\": \"Failed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-27T14:30:00\", \"findings\": [{\"severity\": \"HIGH\", \"description\": \"SQL injection risk in price calculation module\"}, {\"severity\": \"MEDIUM\", \"description\": \"Unvalidated input in discount endpoint\"}]}}}"
+    },
+    {
+      "turn": 9,
+      "role": "assistant",
+      "content": "PR #2 on checkout-web has a FAILED SAST scan with a HIGH severity SQL injection finding. Cannot auto-deploy \u2014 requires lead override with elicitation confirmation per policy."
+    },
+    {
+      "turn": 10,
+      "role": "tool",
+      "content": "{\"tool\": \"run_pre_deploy_checks\", \"result\": {\"pull_request_id\": 1, \"stages\": [{\"stage\": \"unit_tests\", \"status\": \"passed\", \"duration_seconds\": 45}, {\"stage\": \"integration_tests\", \"status\": \"passed\", \"duration_seconds\": 120}, {\"stage\": \"security_scan\", \"status\": \"Passed\", \"scan_type\": \"SAST\", \"duration_seconds\": 78}], \"overall\": \"Passed\"}}"
+    },
+    {
+      "turn": 11,
+      "role": "user",
+      "content": "Check the feature flags for payments-service."
+    },
+    {
+      "turn": 12,
+      "role": "tool",
+      "content": "{\"tool\": \"list_feature_flags\", \"result\": {\"repository\": \"payments-service\", \"flags\": [{\"name\": \"new-payment-retry-logic\", \"staging\": true, \"production\": false}, {\"name\": \"enhanced-webhook-timeout\", \"staging\": true, \"production\": true}]}}"
+    },
+    {
+      "turn": 13,
+      "role": "assistant",
+      "content": "Feature flag review for payments-service: new-payment-retry-logic is enabled in staging but disabled in production \u2014 expected, as PR #1 ships this feature. enhanced-webhook-timeout is already live in both environments."
+    },
+    {
+      "turn": 14,
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 3, \"title\": \"Hotfix: incorrect invoice rounding\", \"status\": \"Open\", \"repository\": \"billing-worker\", \"security_scan\": {\"status\": \"Pending\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-30T08:00:00\"}}}"
+    },
+    {
+      "turn": 15,
+      "role": "assistant",
+      "content": "PR #3 on billing-worker is still Open (not yet reviewed) and its scan is Pending. Deploying this PR would trigger elicitation for both the missing review (rule b) and the pending scan (rule a for production)."
+    },
+    {
+      "turn": 16,
+      "role": "tool",
+      "content": "{\"tool\": \"list_active_incidents\", \"result\": {\"incidents\": [{\"id\": 1, \"title\": \"Invoice queries returning stale cached totals\", \"severity\": \"critical\", \"status\": \"open\", \"repository\": \"billing-worker\", \"created_at\": \"2026-07-25T14:00:00\", \"linked_deployment\": 1}]}}"
+    },
+    {
+      "turn": 17,
+      "role": "user",
+      "content": "Show me the deployment history for checkout-web staging."
+    },
+    {
+      "turn": 18,
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"checkout-web\", \"environment\": \"staging\", \"latest_deployment\": null, \"message\": \"No deployment recorded for this repository/environment yet.\"}}"
+    },
+    {
+      "turn": 19,
+      "role": "assistant",
+      "content": "No deployments recorded for checkout-web staging yet. First deploy would need an Approved PR with Passed scan to auto-proceed."
+    },
+    {
+      "turn": 20,
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 4, \"title\": \"Bump dependency versions\", \"status\": \"Rejected\", \"repository\": \"payments-service\", \"security_scan\": {\"status\": \"Failed\", \"scan_type\": \"Dependency\", \"created_at\": \"2026-07-20T11:00:00\", \"findings\": [{\"severity\": \"HIGH\", \"description\": \"CVE-2026-1234 in requests 2.28.0\"}, {\"severity\": \"HIGH\", \"description\": \"CVE-2026-5678 in urllib3 1.26.x\"}]}}}"
+    },
+    {
+      "turn": 21,
+      "role": "user",
+      "content": "Run pre-deploy checks on PR #3."
+    },
+    {
+      "turn": 22,
+      "role": "tool",
+      "content": "{\"tool\": \"run_pre_deploy_checks\", \"result\": {\"pull_request_id\": 3, \"stages\": [{\"stage\": \"unit_tests\", \"status\": \"passed\", \"duration_seconds\": 38}, {\"stage\": \"integration_tests\", \"status\": \"failed\", \"duration_seconds\": 95, \"errors\": [\"InvoiceRoundingTest.test_zero_amount FAILED: expected 0.00 got -0.01\", \"InvoiceRoundingTest.test_negative_discount FAILED: assertion error\"]}, {\"stage\": \"security_scan\", \"status\": \"skipped\", \"reason\": \"integration tests failed\"}], \"overall\": \"Failed\"}}"
+    },
+    {
+      "turn": 23,
+      "role": "assistant",
+      "content": "Pre-deploy checks for PR #3 on billing-worker FAILED at the integration test stage. Two invoice rounding tests are failing. Security scan was skipped because integration tests didn't pass. PR #3 is NOT ready for deployment."
+    },
+    {
+      "turn": 24,
+      "role": "tool",
+      "content": "{\"tool\": \"list_feature_flags\", \"result\": {\"repository\": \"checkout-web\", \"flags\": [{\"name\": \"new-checkout-price-calc\", \"staging\": false, \"production\": false}]}}"
+    },
+    {
+      "turn": 25,
+      "role": "user",
+      "content": "What's the security scan history for payments-service PR #1?"
+    },
+    {
+      "turn": 26,
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 1, \"security_scans\": [{\"id\": 1, \"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-28T10:00:00\"}, {\"id\": 10, \"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-30T11:00:00\"}], \"latest_scan\": \"Passed\"}}"
+    },
+    {
+      "turn": 27,
+      "role": "assistant",
+      "content": "PR #1 has two SAST scans, both Passed. Latest scan from 2026-07-30 \u2014 within the 30-day validity window."
+    },
+    {
+      "turn": 28,
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"billing-worker\", \"environment\": \"production\", \"latest_deployment\": {\"id\": 1, \"status\": \"Failed\", \"created_at\": \"2026-07-25T13:00:00\", \"deployed_by\": \"Priya Raman\", \"pull_request\": {\"id\": 5, \"title\": \"Add caching layer for invoice queries\"}}}}"
+    },
+    {
+      "turn": 29,
+      "role": "user",
+      "content": "Check if there are any pending rollbacks needed."
+    },
+    {
+      "turn": 30,
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"billing-worker\", \"environment\": \"staging\", \"latest_deployment\": null}}"
+    },
+    {
+      "turn": 31,
+      "role": "tool",
+      "content": "{\"tool\": \"list_active_incidents\", \"result\": {\"incidents\": [{\"id\": 1, \"title\": \"Invoice queries returning stale cached totals\", \"severity\": \"critical\", \"status\": \"open\", \"age_hours\": 120, \"last_update\": \"Rollback attempted but caching invalidation bug persists in database layer\"}]}}"
+    },
+    {
+      "turn": 32,
+      "role": "assistant",
+      "content": "Active critical incident #1 on billing-worker has been open for 120 hours. The rollback was attempted but the caching invalidation bug persists at the database layer. No new deployments to billing-worker should proceed until this is resolved."
+    },
+    {
+      "turn": 33,
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 5, \"title\": \"Add caching layer for invoice queries\", \"status\": \"Merged\", \"repository\": \"billing-worker\", \"security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-24T09:00:00\"}}}"
+    },
+    {
+      "turn": 34,
+      "role": "user",
+      "content": "What feature flags are active on billing-worker production?"
+    },
+    {
+      "turn": 35,
+      "role": "tool",
+      "content": "{\"tool\": \"list_feature_flags\", \"result\": {\"repository\": \"billing-worker\", \"flags\": [{\"name\": \"invoice-cache-layer\", \"staging\": null, \"production\": true, \"note\": \"This flag enabled the caching layer that is currently causing the critical incident\"}]}}"
+    },
+    {
+      "turn": 36,
+      "role": "assistant",
+      "content": "The invoice-cache-layer flag is active in billing-worker production. This is the flag associated with the active critical incident. It should NOT be disabled via a new deployment until the root cause is fully understood \u2014 disabling it incorrectly could cause a different failure mode."
+    },
+    {
+      "turn": 37,
+      "role": "tool",
+      "content": "{\"tool\": \"run_pre_deploy_checks\", \"result\": {\"pull_request_id\": 1, \"stages\": [{\"stage\": \"unit_tests\", \"status\": \"passed\", \"duration_seconds\": 42}, {\"stage\": \"integration_tests\", \"status\": \"passed\", \"duration_seconds\": 115}, {\"stage\": \"security_scan\", \"status\": \"Passed\", \"scan_type\": \"SAST\", \"duration_seconds\": 71}], \"overall\": \"Passed\"}}"
+    },
+    {
+      "turn": 38,
+      "role": "assistant",
+      "content": "Final pre-deploy checks for payments-service PR #1: all three stages passed. Ready for production deployment pending engineer confirmation."
+    },
+    {
+      "turn": 39,
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"payments-service\", \"environment\": \"production\", \"latest_deployment\": {\"id\": 3, \"status\": \"Succeeded\", \"created_at\": \"2026-07-15T11:00:00\", \"pull_request\": {\"id\": 1, \"title\": \"Add retry logic to payment webhook\"}}}}"
+    },
+    {
+      "turn": 40,
+      "role": "user",
+      "content": "Is it safe to deploy to billing-worker production right now? Give me a clear yes or no and your reasoning."
+    }
+  ]
+}

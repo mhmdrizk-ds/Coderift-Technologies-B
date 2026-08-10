@@ -1,0 +1,45 @@
+transcript,strategy,passed,missing_keywords,original_input_tokens,pruned_input_tokens,compression_pct,output_tokens,latency_ms
+base_transcript.json,sliding_window,False,"consecutive failed,unstable",2088,1064,49.0,56,0.0027
+base_transcript.json,observation_masking,True,,2088,1052,49.6,68,0.0065
+base_transcript.json,recursive_summarization,True,,2088,1091,47.7,68,0.1155
+base_transcript.json,zone_based_pruning,True,,2088,947,54.6,68,0.2939
+variation_01.json,sliding_window,True,,865,865,0.0,68,0.0023
+variation_01.json,observation_masking,True,,865,444,48.7,68,0.0047
+variation_01.json,recursive_summarization,True,,865,865,0.0,68,0.0001
+variation_01.json,zone_based_pruning,True,,865,353,59.2,68,0.0918
+variation_02.json,sliding_window,True,,847,847,0.0,68,0.002
+variation_02.json,observation_masking,True,,847,444,47.6,68,0.0058
+variation_02.json,recursive_summarization,True,,847,847,0.0,68,0.0001
+variation_02.json,zone_based_pruning,True,,847,353,58.3,68,0.0913
+variation_03.json,sliding_window,False,"consecutive failed,unstable,critical incident",1356,861,36.5,60,0.0021
+variation_03.json,observation_masking,True,,1356,513,62.2,68,0.0055
+variation_03.json,recursive_summarization,False,"consecutive failed,unstable,critical incident",1356,911,32.8,60,0.0555
+variation_03.json,zone_based_pruning,True,,1356,393,71.0,68,0.1572
+variation_04.json,sliding_window,True,,1357,905,33.3,68,0.002
+variation_04.json,observation_masking,True,,1357,511,62.3,68,0.0051
+variation_04.json,recursive_summarization,True,,1357,955,29.6,68,0.0558
+variation_04.json,zone_based_pruning,True,,1357,392,71.1,68,0.1589
+variation_05.json,sliding_window,True,,1351,904,33.1,68,0.0021
+variation_05.json,observation_masking,True,,1351,511,62.2,68,0.0051
+variation_05.json,recursive_summarization,True,,1351,954,29.4,68,0.0545
+variation_05.json,zone_based_pruning,True,,1351,334,75.3,68,0.1744
+variation_06.json,sliding_window,False,"consecutive failed,unstable,critical incident",1756,884,49.7,60,0.0041
+variation_06.json,observation_masking,True,,1756,572,67.4,68,0.0104
+variation_06.json,recursive_summarization,False,"consecutive failed,unstable,critical incident",1756,934,46.8,60,0.1159
+variation_06.json,zone_based_pruning,True,,1756,332,81.1,68,0.2231
+variation_07.json,sliding_window,False,"consecutive failed,unstable,critical incident",1756,882,49.8,60,0.0026
+variation_07.json,observation_masking,True,,1756,568,67.7,68,0.0067
+variation_07.json,recursive_summarization,False,"consecutive failed,unstable,critical incident",1756,932,46.9,60,0.099
+variation_07.json,zone_based_pruning,True,,1756,329,81.3,68,0.2268
+variation_08.json,sliding_window,True,,1804,974,46.0,68,0.0024
+variation_08.json,observation_masking,True,,1804,567,68.6,68,0.007
+variation_08.json,recursive_summarization,True,,1804,1024,43.2,68,0.1087
+variation_08.json,zone_based_pruning,True,,1804,322,82.2,68,0.2367
+variation_09.json,sliding_window,False,"consecutive failed,unstable,critical incident",2648,862,67.4,60,0.0037
+variation_09.json,observation_masking,True,,2648,739,72.1,68,0.0103
+variation_09.json,recursive_summarization,False,"consecutive failed,unstable,critical incident",2648,912,65.6,60,0.2242
+variation_09.json,zone_based_pruning,True,,2648,391,85.2,68,0.3902
+variation_10.json,sliding_window,True,,2637,902,65.8,68,0.004
+variation_10.json,observation_masking,True,,2637,739,72.0,68,0.0104
+variation_10.json,recursive_summarization,True,,2637,952,63.9,68,0.2072
+variation_10.json,zone_based_pruning,True,,2637,390,85.2,68,0.3781

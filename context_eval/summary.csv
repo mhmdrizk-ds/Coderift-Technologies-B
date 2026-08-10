@@ -1,0 +1,5 @@
+strategy,accuracy_pct,passed,total,avg_input_tokens,avg_output_tokens,avg_compression_pct,avg_latency_ms
+zone_based_pruning,100.0,11,11,412.4,68.0,73.1,0.2202
+observation_masking,100.0,11,11,605.5,68.0,61.9,0.007
+recursive_summarization,63.6,7,11,943.4,65.1,36.9,0.0942
+sliding_window,54.5,6,11,904.5,64.0,39.1,0.0027
