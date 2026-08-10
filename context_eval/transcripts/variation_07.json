@@ -1,0 +1,211 @@
+{
+  "description": "Variation: 40 turns, critical detail at turn 20.",
+  "grading_keywords": [
+    "consecutive failed",
+    "unstable",
+    "critical incident",
+    "billing-worker"
+  ],
+  "messages": [
+    {
+      "turn": 1,
+      "role": "system",
+      "content": "You are a Coderift Technologies deployment assistant. Help engineers make safe deployment decisions."
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 1, \"title\": \"Routine change #0\", \"status\": \"Open\", \"repository\": \"payments-service\", \"security_scan\": {\"status\": \"Pending\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-01T10:00:00\"}}}",
+      "turn": 2
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"payments-service\", \"environment\": \"staging\", \"latest_deployment\": {\"id\": 101, \"status\": \"Succeeded\", \"created_at\": \"2026-07-02T09:00:00\", \"deployed_by\": \"Ines Duarte\"}}}",
+      "turn": 3
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"run_pre_deploy_checks\", \"result\": {\"pull_request_id\": 3, \"stages\": [{\"stage\": \"unit_tests\", \"status\": \"passed\", \"duration_seconds\": 32}, {\"stage\": \"integration_tests\", \"status\": \"passed\", \"duration_seconds\": 92}, {\"stage\": \"security_scan\", \"status\": \"Passed\", \"duration_seconds\": 62}], \"overall\": \"Passed\"}}",
+      "turn": 4
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"list_feature_flags\", \"result\": {\"repository\": \"payments-service\", \"flags\": [{\"name\": \"feature-flag-3\", \"staging\": true, \"production\": false}]}}",
+      "turn": 5
+    },
+    {
+      "role": "assistant",
+      "content": "Reviewed the output above \u2014 nothing else notable for this check (4).",
+      "turn": 6
+    },
+    {
+      "role": "user",
+      "content": "Also check PR #1 for me.",
+      "turn": 7
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 2, \"title\": \"Routine change #6\", \"status\": \"Approved\", \"repository\": \"payments-service\", \"security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-07T10:00:00\"}}}",
+      "turn": 8
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"checkout-web\", \"environment\": \"production\", \"latest_deployment\": {\"id\": 107, \"status\": \"Succeeded\", \"created_at\": \"2026-07-08T09:00:00\", \"deployed_by\": \"Marcus Webb\"}}}",
+      "turn": 9
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"run_pre_deploy_checks\", \"result\": {\"pull_request_id\": 4, \"stages\": [{\"stage\": \"unit_tests\", \"status\": \"passed\", \"duration_seconds\": 38}, {\"stage\": \"integration_tests\", \"status\": \"passed\", \"duration_seconds\": 98}, {\"stage\": \"security_scan\", \"status\": \"Passed\", \"duration_seconds\": 68}], \"overall\": \"Passed\"}}",
+      "turn": 10
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"list_feature_flags\", \"result\": {\"repository\": \"payments-service\", \"flags\": [{\"name\": \"feature-flag-9\", \"staging\": true, \"production\": false}]}}",
+      "turn": 11
+    },
+    {
+      "role": "assistant",
+      "content": "Reviewed the output above \u2014 nothing else notable for this check (10).",
+      "turn": 12
+    },
+    {
+      "role": "user",
+      "content": "Also check PR #2 for me.",
+      "turn": 13
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 3, \"title\": \"Routine change #12\", \"status\": \"Open\", \"repository\": \"payments-service\", \"security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-13T10:00:00\"}}}",
+      "turn": 14
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"payments-service\", \"environment\": \"staging\", \"latest_deployment\": {\"id\": 113, \"status\": \"InProgress\", \"created_at\": \"2026-07-14T09:00:00\", \"deployed_by\": \"Marcus Webb\"}}}",
+      "turn": 15
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"run_pre_deploy_checks\", \"result\": {\"pull_request_id\": 5, \"stages\": [{\"stage\": \"unit_tests\", \"status\": \"passed\", \"duration_seconds\": 44}, {\"stage\": \"integration_tests\", \"status\": \"passed\", \"duration_seconds\": 104}, {\"stage\": \"security_scan\", \"status\": \"Passed\", \"duration_seconds\": 74}], \"overall\": \"Passed\"}}",
+      "turn": 16
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"list_feature_flags\", \"result\": {\"repository\": \"payments-service\", \"flags\": [{\"name\": \"feature-flag-15\", \"staging\": true, \"production\": false}]}}",
+      "turn": 17
+    },
+    {
+      "role": "assistant",
+      "content": "Reviewed the output above \u2014 nothing else notable for this check (16).",
+      "turn": 18
+    },
+    {
+      "role": "user",
+      "content": "Also check PR #3 for me.",
+      "turn": 19
+    },
+    {
+      "role": "assistant",
+      "content": "I checked the deployment history for billing-worker. CRITICAL FINDING: billing-worker has had 3 consecutive failed deployments in the last 14 days. The repository is flagged as deployment-unstable. There is also an active critical incident (#1) linked to deployment #1. The system should not accept new production deployments to billing-worker until the root cause is resolved and the incident is closed.",
+      "turn": 20
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"payments-service\", \"environment\": \"staging\", \"latest_deployment\": {\"id\": 119, \"status\": \"InProgress\", \"created_at\": \"2026-07-20T09:00:00\", \"deployed_by\": \"Ines Duarte\"}}}",
+      "turn": 21
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"run_pre_deploy_checks\", \"result\": {\"pull_request_id\": 1, \"stages\": [{\"stage\": \"unit_tests\", \"status\": \"passed\", \"duration_seconds\": 30}, {\"stage\": \"integration_tests\", \"status\": \"passed\", \"duration_seconds\": 110}, {\"stage\": \"security_scan\", \"status\": \"Passed\", \"duration_seconds\": 60}], \"overall\": \"Passed\"}}",
+      "turn": 22
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"list_feature_flags\", \"result\": {\"repository\": \"payments-service\", \"flags\": [{\"name\": \"feature-flag-21\", \"staging\": true, \"production\": false}]}}",
+      "turn": 23
+    },
+    {
+      "role": "assistant",
+      "content": "Reviewed the output above \u2014 nothing else notable for this check (22).",
+      "turn": 24
+    },
+    {
+      "role": "user",
+      "content": "Also check PR #4 for me.",
+      "turn": 25
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 5, \"title\": \"Routine change #24\", \"status\": \"Approved\", \"repository\": \"checkout-web\", \"security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-25T10:00:00\"}}}",
+      "turn": 26
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"payments-service\", \"environment\": \"staging\", \"latest_deployment\": {\"id\": 125, \"status\": \"InProgress\", \"created_at\": \"2026-07-26T09:00:00\", \"deployed_by\": \"Marcus Webb\"}}}",
+      "turn": 27
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"run_pre_deploy_checks\", \"result\": {\"pull_request_id\": 2, \"stages\": [{\"stage\": \"unit_tests\", \"status\": \"passed\", \"duration_seconds\": 36}, {\"stage\": \"integration_tests\", \"status\": \"passed\", \"duration_seconds\": 116}, {\"stage\": \"security_scan\", \"status\": \"Passed\", \"duration_seconds\": 66}], \"overall\": \"Passed\"}}",
+      "turn": 28
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"list_feature_flags\", \"result\": {\"repository\": \"payments-service\", \"flags\": [{\"name\": \"feature-flag-27\", \"staging\": true, \"production\": false}]}}",
+      "turn": 29
+    },
+    {
+      "role": "assistant",
+      "content": "Reviewed the output above \u2014 nothing else notable for this check (28).",
+      "turn": 30
+    },
+    {
+      "role": "user",
+      "content": "Also check PR #5 for me.",
+      "turn": 31
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 1, \"title\": \"Routine change #30\", \"status\": \"Approved\", \"repository\": \"payments-service\", \"security_scan\": {\"status\": \"Pending\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-03T10:00:00\"}}}",
+      "turn": 32
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"checkout-web\", \"environment\": \"production\", \"latest_deployment\": {\"id\": 131, \"status\": \"InProgress\", \"created_at\": \"2026-07-04T09:00:00\", \"deployed_by\": \"Priya Raman\"}}}",
+      "turn": 33
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"run_pre_deploy_checks\", \"result\": {\"pull_request_id\": 3, \"stages\": [{\"stage\": \"unit_tests\", \"status\": \"passed\", \"duration_seconds\": 42}, {\"stage\": \"integration_tests\", \"status\": \"passed\", \"duration_seconds\": 92}, {\"stage\": \"security_scan\", \"status\": \"Passed\", \"duration_seconds\": 72}], \"overall\": \"Passed\"}}",
+      "turn": 34
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"list_feature_flags\", \"result\": {\"repository\": \"checkout-web\", \"flags\": [{\"name\": \"feature-flag-33\", \"staging\": true, \"production\": false}]}}",
+      "turn": 35
+    },
+    {
+      "role": "assistant",
+      "content": "Reviewed the output above \u2014 nothing else notable for this check (34).",
+      "turn": 36
+    },
+    {
+      "role": "user",
+      "content": "Also check PR #1 for me.",
+      "turn": 37
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"get_pull_request\", \"result\": {\"id\": 2, \"title\": \"Routine change #36\", \"status\": \"Open\", \"repository\": \"checkout-web\", \"security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-07-09T10:00:00\"}}}",
+      "turn": 38
+    },
+    {
+      "role": "tool",
+      "content": "{\"tool\": \"check_deployment_status\", \"result\": {\"repository\": \"payments-service\", \"environment\": \"staging\", \"latest_deployment\": {\"id\": 137, \"status\": \"Succeeded\", \"created_at\": \"2026-07-10T09:00:00\", \"deployed_by\": \"Priya Raman\"}}}",
+      "turn": 39
+    },
+    {
+      "role": "user",
+      "content": "Is it safe to deploy to billing-worker production right now? Give me a clear yes or no and your reasoning.",
+      "turn": 40
+    }
+  ]
+}
