@@ -28,6 +28,22 @@ def rebuild_database():
     subprocess.run([sys.executable, str(PROJECT_ROOT / "db" / "init_db.py")], check=True)
 
 
+def reset_semantic_memory():
+    """Delete the persisted cross-session semantic store so --all is
+    idempotent, same reasoning as rebuild_database() above. Without this,
+    a previous --all run (or demo/cross_session_memory_demo.py) leaves
+    memory/data/semantic_facts.json on disk, and scenario
+    'memory_recall_in_session' — which hard-asserts nothing is known about
+    'billing-worker' before it establishes anything — throws an
+    AssertionError on any run after the first. The DB already gets this
+    same fresh-start treatment; the semantic store needs it too so --all
+    is safe to run repeatedly, which is the whole point of the flag."""
+    persist_path = PROJECT_ROOT / "memory" / "data" / "semantic_facts.json"
+    if persist_path.exists():
+        print(">>> Resetting persisted semantic memory (memory/data/semantic_facts.json) ...")
+        persist_path.unlink()
+
+
 def build_session(name, scenario_data, interactive):
     profile = "read_only" if name in READ_ONLY_SCENARIOS else "full"
 
@@ -100,6 +116,7 @@ def main():
     if args.all:
         if not args.no_rebuild:
             rebuild_database()
+            reset_semantic_memory()
         for name in SCENARIO_ORDER:
             run_scenario(name, all_data, args.interactive)
         return
