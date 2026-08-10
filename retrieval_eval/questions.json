@@ -1,0 +1,89 @@
+{
+  "note": "policy_name is the single policy naive/hybrid RAG are told to search — for multi_part questions this is deliberately just the first relevant policy, so the eval also shows naive/hybrid missing the other half of the answer, not just agentic winning on style points. expected_keywords are used for the offline accuracy grader in run_eval.py (fraction of these terms found, case-insensitive, in the returned answer).",
+  "questions": [
+    {
+      "id": "q1",
+      "category": "general",
+      "question": "What is the standard security scan requirement before deploying to production?",
+      "policy_name": "production_deployment",
+      "expected_keywords": ["passed", "scan", "production"]
+    },
+    {
+      "id": "q2",
+      "category": "general",
+      "question": "How long is a security scan result considered valid?",
+      "policy_name": "security_review",
+      "expected_keywords": ["30", "days", "valid"]
+    },
+    {
+      "id": "q3",
+      "category": "general",
+      "question": "Who is responsible for approving hotfix deployments?",
+      "policy_name": "incident_response",
+      "expected_keywords": ["lead", "reviewed", "hotfix"]
+    },
+    {
+      "id": "q4",
+      "category": "general",
+      "question": "What roles are authorized to deploy to production?",
+      "policy_name": "production_deployment",
+      "expected_keywords": ["senior", "lead", "junior"]
+    },
+    {
+      "id": "q5",
+      "category": "exact_id",
+      "question": "What does Section 4.2 of the security review policy say about how an override must be confirmed?",
+      "policy_name": "security_review",
+      "expected_keywords": ["elicitation", "confirmation", "audit"]
+    },
+    {
+      "id": "q6",
+      "category": "exact_id",
+      "question": "What is the SLA for responding to a critical-severity incident?",
+      "policy_name": "incident_response",
+      "expected_keywords": ["5 minutes", "critical", "acknowledgment"]
+    },
+    {
+      "id": "q7",
+      "category": "exact_id",
+      "question": "What does the production deployment policy say about deploying during an active critical incident?",
+      "policy_name": "production_deployment",
+      "expected_keywords": ["active", "incident", "assess"]
+    },
+    {
+      "id": "q8",
+      "category": "exact_id",
+      "question": "What does Section 5 of the production deployment policy say about the override procedure?",
+      "policy_name": "production_deployment",
+      "expected_keywords": ["elicitation", "confirm", "override"]
+    },
+    {
+      "id": "q9",
+      "category": "multi_part",
+      "question": "For a repository with 3 consecutive failed deployments and an active critical incident, what is the complete required response: who to page, whether to halt all deployments, what approvals are needed for any emergency fix, and what the post-incident review must cover?",
+      "policy_name": "incident_response",
+      "expected_keywords": ["page", "halt", "lead", "postmortem"]
+    },
+    {
+      "id": "q10",
+      "category": "multi_part",
+      "question": "If a security scan returns Failed for a PR targeting production, what are all the options available to the engineer, who can authorize each one, and under what time constraints?",
+      "policy_name": "security_review",
+      "expected_keywords": ["lead", "override", "elicitation", "24 hours"]
+    },
+    {
+      "id": "q11",
+      "category": "multi_part",
+      "question": "During an active critical incident that halted deployments, what are the requirements for an emergency hotfix PR, from scan validity through review through post-deployment follow-up?",
+      "policy_name": "incident_response",
+      "expected_keywords": ["72 hours", "lead", "24 hours", "follow-up"]
+    },
+    {
+      "id": "q12",
+      "category": "multi_part",
+      "question": "A PR has a Failed security scan and is also unreviewed, and the deploying engineer wants to override and ship to production anyway — what does the production deployment policy require, and what does the security review policy separately require for the override to be valid?",
+      "policy_name": "production_deployment",
+      "expected_keywords": ["elicitation", "confirm", "lead", "documented"]
+    }
+  ]
+}
