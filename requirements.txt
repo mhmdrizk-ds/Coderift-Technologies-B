@@ -9,3 +9,17 @@ uvicorn>=0.29
 # urllib (stdlib) if GOOGLE_API_KEY/GEMINI_API_KEY is set, so no SDK
 # package is required for that either — it falls back to a deterministic
 # offline rule engine when no key is configured.
+
+# Memory & RAG lab (memory/, rag/, context_eval/, retrieval_eval/):
+chromadb>=0.5           # vector store, HNSW index
+langchain-core>=0.3      # Document interface used across rag/vector_store
+langchain-text-splitters>=0.3  # section-header chunking
+rank-bm25>=0.2.2         # keyword scoring for hybrid_rag.py's RRF fusion
+networkx>=3.2             # concept graph for the graph_rag.py bonus
+pytest>=8.0               # memory/tests/
+
+# Optional, not required for the pipeline to run (falls back to a
+# deterministic offline TF-IDF embedder if unavailable — see
+# rag/vector_store/embeddings.py):
+sentence-transformers>=3.0
+langchain-huggingface>=0.1
