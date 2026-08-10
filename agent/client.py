@@ -37,11 +37,19 @@ def build_session(name, scenario_data, interactive):
         fixed = scenario_data.get("elicitation_response", DEFAULT_ELICITATION_ANSWER)
         elicit = scripted_elicitation_handler(fixed)
 
+    # A handful of tool calls in a short demo scenario would never overflow
+    # the real 50-message default buffer, so nothing would reach the
+    # router. A small buffer here demonstrates the same pipeline
+    # (buffer -> router -> episodic -> consolidation) without needing 50+
+    # calls — see agent/scenarios.py's memory_recall_in_session docstring.
+    memory_buffer_capacity = 3 if name == "memory_recall_in_session" else 50
+
     return CoderiftAgentSession(
         elicitation_handler=elicit,
         sampling_handler=sampling_handler,
         progress_handler=progress_handler,
         capability_profile=profile,
+        memory_buffer_capacity=memory_buffer_capacity,
     )
 
 
