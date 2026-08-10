@@ -159,13 +159,96 @@ own defensive validation (PR must be Approved + Passed to merge; a
 deployment must be Succeeded/InProgress to roll back) is enough to make
 them safe without a human pause.
 
+## Memory & RAG (Session 3 extension)
+
+Two real problems emerge once engineers actually use this agent across
+shifts, beyond what the MCP server's tools alone can fix:
+
+**Problem 1 — Memory.** Engineers lose all session context when a
+conversation ends. If Engineer A's session establishes that
+`billing-worker` has had 3 consecutive failed deployments and an active
+critical incident, Engineer B starting a fresh session has no memory of
+this — the agent treats everything as brand new. `memory/` fixes this: a
+rolling short-term buffer hands evicted messages to a promote-or-drop
+router (`memory/router.py`, with zero structural access to semantic
+memory), promoted messages become episodes, and a periodic — never
+write-time — consolidation pass turns episodes into versioned, expirable
+semantic facts (`memory/consolidation.py`, `memory/semantic_store.py`).
+Semantic facts persist to disk (`memory/data/semantic_facts.json`) so a
+**new `MemorySystem()` instance in a completely separate process** — a
+different engineer's session — loads them on construction.
+`demo/cross_session_memory_demo.py` proves this end to end: it runs two
+genuinely separate sessions and confirms Engineer B's brand-new session
+correctly refuses to treat `billing-worker` as safe to deploy to, without
+ever having lived through Engineer A's conversation.
+
+**Problem 2 — Knowledge.** Engineers ask questions the database was never
+built to answer — "what's the required approval chain for a hotfix
+deployment during an active incident?" — that only live in the company's
+internal policy documents. `rag/` fixes this: three expanded policy
+documents (`resources/production_deployment_policy.md`,
+`security_review_policy.md`, `incident_response_runbook.md`, 40+
+statements each) are chunked, embedded, and indexed in Chroma with
+metadata filtering applied **during** HNSW search, not after. Three
+retrieval architectures are implemented and evaluated against the same
+12-question set (see `retrieval_eval/README.md` for the full comparison):
+naive (baseline), hybrid (vector + BM25 via Reciprocal Rank Fusion — wins
+on exact-identifier questions like "what does Section 4.2 say?"), and
+agentic (a retrieve-observe-decide loop that combines multiple policies —
+wins on multi-part questions naive/hybrid can only partially answer). A
+bonus NetworkX-based Graph RAG (`rag/graph_rag.py`) is also implemented and
+evaluated honestly against the same set — it does not beat agentic RAG on
+this evaluation, and `rag/GRAPH_RAG_README.md` explains why rather than
+hiding the result.
+
+Every RAG answer and every memory recall passes through Self-RAG
+verification (`rag/self_rag.py`) before being trusted — `check_relevance()`
+and `check_support()`, each with a live-model path and a deterministic
+offline fallback — so a recalled fact or a generated answer is never
+presented with more confidence than the evidence behind it supports.
+
+Context window management is a related but separate concern: a real
+Coderift session involves dozens of tool calls, and an early critical
+detail can get buried under tool JSON noise before the final question is
+asked. `context_eval/` benchmarks four pruning strategies against 11
+transcripts (40-turn base + 10 variations spanning different lengths and
+critical-detail positions) and finds `observation_masking` wins — 100%
+accuracy, fastest of the two 100%-accuracy strategies — because it targets
+Coderift's actual bloat source (tool output, not dialogue). Full
+justification and real numbers in `context_eval/README.md`.
+
+```bash
+# Build the vector store (once, or after editing a policy doc)
+python3 rag/vector_store/vector_db.py
+
+# Run the memory + RAG test suite
+python3 -m pytest memory/tests/ -q
+
+# Run the flagship cross-session memory demo
+python3 demo/cross_session_memory_demo.py
+
+# Run the context-window-management benchmark
+cd context_eval && python3 benchmark.py
+
+# Run the retrieval architecture evaluation
+cd retrieval_eval && python3 run_eval.py
+
+# Run the full agent demo including RAG + memory scenarios (12 total)
+python3 -m agent.client --all
+```
+
 ## Repository layout
 
 ```
 db/               schema.sql, seed.sql, ERD.mmd, init_db.py, README.md
 mcp_server/       server code — see mcp_server/README.md for the concern-by-concern index
-resources/        Production Deployment Policy (resource content)
+resources/        Policy documents (RAG corpus) — production deployment, security review, incident response
 prompts/          draft_rollback_plan / draft_incident_postmortem (prompt templates)
 agent/            demo client — see agent/README.md
-demo/             DEMO_TRANSCRIPT.md — a full --all run, all 9 concerns firing
+memory/           short-term buffer, router, episodic/semantic stores, consolidation, scheduler — memory/api.py is the only import surface
+rag/              naive/hybrid/agentic/graph RAG, Self-RAG, vector store — see rag/README.md
+context_eval/     context-window pruning strategy benchmark — see context_eval/README.md
+retrieval_eval/   RAG architecture comparison — see retrieval_eval/README.md
+demo/             DEMO_TRANSCRIPT.md (MCP lab, all 9 concerns) + cross_session_memory_demo.py (Session 3 flagship demo)
 ```
+

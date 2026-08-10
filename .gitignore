@@ -23,6 +23,15 @@ env/
 # commit the binary artifact, only the SQL that produces it.
 db/coderift.db
 
+# Same reasoning for generated/session-local memory & RAG artifacts that
+# are pure runtime state (rebuildable from source, or specific to one
+# person's local session) — but NOT the eval results below, which are
+# committed as required deliverables (real numbers from a real run).
+rag/vector_store/chroma_db/
+memory/data/*.json
+memory/logs/*.json
+!memory/data/.gitkeep
+
 # Editor / OS
 .vscode/
 .idea/
