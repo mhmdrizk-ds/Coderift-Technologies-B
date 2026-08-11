@@ -80,7 +80,7 @@ class _StructuredOutputRunnable(Runnable):
             f"\n\nRespond with ONLY a single JSON object matching this JSON "
             f"schema (no prose, no markdown fences):\n{self._schema.model_json_schema()}"
         )
-        text = _call_google(prompt + schema_hint, system_prompt, max_tokens=900)
+        text = _call_google(prompt + schema_hint, system_prompt, max_tokens=4096)
         if text is None:
             raise NoLiveModelConfigured(
                 "with_structured_output has no GOOGLE_API_KEY/GEMINI_API_KEY to call — "
@@ -106,7 +106,7 @@ class CoderiftChatModel(SimpleChatModel):
         **kwargs: Any,
     ) -> str:
         prompt, system_prompt = _split_system_human(messages)
-        text = _call_google(prompt, system_prompt, max_tokens=700)
+        text = _call_google(prompt, system_prompt, max_tokens=4096)
         if text is None:
             text = (
                 "[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured — "
