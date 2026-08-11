@@ -3,7 +3,10 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 def plan_and_solve(question: str, llm: BaseChatModel) -> str:
     response = llm.invoke([
-        ("system", "You use Plan-and-Solve prompting. Clearly separate PLAN from SOLUTION."),
+        ("system", "You use Plan-and-Solve prompting. Clearly separate PLAN from SOLUTION. "
+                   "When the question includes real facts (PR statuses, security scans, "
+                   "open incidents), never silently drop or ignore one of them in the "
+                   "SOLUTION — call out anything that isn't ready."),
         ("human", f"""{question}
 
 First understand the problem and devise a plan to solve it. Then carry out the
