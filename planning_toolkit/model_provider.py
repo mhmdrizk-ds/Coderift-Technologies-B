@@ -37,8 +37,8 @@ def _call_google(prompt: str, system_prompt: str | None, max_tokens: int) -> str
     if not api_key:
         return None
     body = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": max_tokens},
+        "contents": [...],
+        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": temperature},
     }
     if system_prompt:
         body["systemInstruction"] = {"parts": [{"text": system_prompt}]}
