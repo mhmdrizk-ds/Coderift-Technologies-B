@@ -22,6 +22,8 @@ import urllib.request
 GOOGLE_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 GOOGLE_MODEL = os.environ.get("GOOGLE_MODEL", "gemini-2.5-flash")
 
+MISTRAL_API_BASE = "https://api.mistral.ai/v1/chat/completions"
+MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-small-latest")
 
 def _flatten_messages(messages):
     """MCP sampling `messages` -> Gemini `contents` (role "assistant" ->
@@ -63,6 +65,42 @@ def _call_google(messages, system_prompt, max_tokens):
         parts = candidates[0].get("content", {}).get("parts", [])
         text = "".join(p.get("text", "") for p in parts).strip()
         return text or None
+    except (urllib.error.URLError, urllib.error.HTTPError, KeyError, ValueError, TimeoutError):
+        return None
+
+
+def _call_mistral(messages, system_prompt, max_tokens):
+    api_key = os.environ.get("MISTRAL_API_KEY")
+    if not api_key:
+        return None
+
+    mistral_messages = []
+    if system_prompt:
+        mistral_messages.append({"role": "system", "content": system_prompt})
+    for m in messages:
+        content = m.get("content", {})
+        text = content.get("text", "") if isinstance(content, dict) else str(content)
+        role = m.get("role", "user")
+        mistral_messages.append({"role": role, "content": text})
+
+    body = {
+        "model": MISTRAL_MODEL,
+        "messages": mistral_messages,
+        "max_tokens": max_tokens,
+    }
+    req = urllib.request.Request(
+        MISTRAL_API_BASE,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return data["choices"][0]["message"]["content"].strip() or None
     except (urllib.error.URLError, urllib.error.HTTPError, KeyError, ValueError, TimeoutError):
         return None
 
@@ -125,6 +163,8 @@ def sampling_handler(messages, system_prompt, max_tokens):
     print("-" * 70)
 
     text = _call_google(messages, system_prompt, max_tokens)
+    if text is None:
+        text = _call_mistral(messages, system_prompt, max_tokens)
     used_live_model = text is not None
     if text is None:
         text = _fallback_incident_summary(messages)
