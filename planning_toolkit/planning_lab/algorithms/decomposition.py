@@ -161,10 +161,10 @@ def execute_plan(
                 elif domain_mode and task_id == "synthesize_release_plan":
                     draft = outputs["rank_release_order"]
                     reasoning_jobs[task_id] = lambda d=draft: reflect_and_refine(
-                        goal=plan.goal, draft=d, llm=llm,
-                        repository_name=repository_name,
-                        candidate_pull_request_ids=candidate_pull_request_ids,
-                    ).revised
+                    goal=plan.goal,
+                    draft=d,
+                    llm=llm,
+                ).revised
                 else:
                     task = plan.task(task_id)
                     context = "\n\n".join(
