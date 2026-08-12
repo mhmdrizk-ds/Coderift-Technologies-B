@@ -1,194 +1,362 @@
-import random
+import json
 from types import SimpleNamespace
 
 import pytest
 
-from planning_lab.algorithms import (
-    Environment,
-    deterministic_checks,
-    execute_plan,
-    final_output,
-    flatten_lats_tree,
-    lats,
-    reflexion,
+from planning_toolkit.model_provider import (
+    CoderiftChatModel,
+    NoLiveModelConfigured,
 )
-from planning_lab.models import EnvironmentFeedback, Plan
-from planning_lab.algorithms.decomposition import GeneratedPlan
-from planning_lab.algorithms.dynamic_decomposition import DynamicDecision
-from planning_lab.algorithms.lats import LATSActionBatch, ValueEstimate
-from planning_lab.algorithms.tree_of_thoughts import ThoughtCandidates, ThoughtEvaluation
-from langchain_mistralai import ChatMistralAI
+from planning_toolkit.planning_lab.algorithms.environment import Environment
+from planning_toolkit.planning_lab.algorithms.decomposition import (
+    GeneratedPlan,
+    decompose_goal,
+)
+from planning_toolkit.planning_lab.algorithms.plan_and_solve import plan_and_solve
+from planning_toolkit.planning_lab.algorithms.self_refine import (
+    deterministic_checks,
+    reflect_and_refine,
+)
+from planning_toolkit.planning_lab.models import Plan
 
 
-class RecordingLLM:
-    def __init__(self):
-        self.prompts = []
+# ============================================================
+# Grounded Environment
+# ============================================================
 
-    def invoke(self, messages, **kwargs):
-        prompt = messages[-1][1]
-        self.prompts.append(prompt)
-        current = next(
-            line.strip() for line in prompt.splitlines() if line.strip().startswith("Current task:")
-        )
-        return SimpleNamespace(
-            content=f"Completed {current} with enough concrete detail for the downstream synthesis task."
-        )
+def test_environment_accepts_valid_deploy_state():
+    environment = Environment()
+
+    result = environment.evaluate(json.dumps({
+        "action": "deploy_pr",
+        "repository_name": "payments-service",
+        "environment_name": "staging",
+        "pull_request_id": 1,
+    }))
+
+    assert result.success is True
+    assert result.score == 1.0
+    assert result.details == []
 
 
-def test_dag_order_and_parallel_batches():
+def test_environment_rejects_deploy_with_open_incident():
+    environment = Environment()
+
+    result = environment.evaluate(json.dumps({
+        "action": "deploy_pr",
+        "repository_name": "billing-worker",
+        "environment_name": "production",
+        "pull_request_id": 5,
+    }))
+
+    assert result.success is False
+    assert result.score < 1.0
+    assert any("incident" in detail.lower() for detail in result.details)
+
+
+def test_environment_rejects_invalid_json():
+    environment = Environment()
+
+    result = environment.evaluate("not valid json")
+
+    assert result.success is False
+    assert result.score == 0.0
+    assert "not valid json" in result.details[0].lower()
+
+
+def test_environment_rejects_unknown_action():
+    environment = Environment()
+
+    result = environment.evaluate(json.dumps({
+        "action": "something_unknown",
+    }))
+
+    assert result.success is False
+    assert result.score == 0.0
+    assert "unknown action type" in result.details[0].lower()
+
+
+def test_environment_rejects_missing_required_field():
+    environment = Environment()
+
+    result = environment.evaluate(json.dumps({
+        "action": "deploy_pr",
+        "repository_name": "payments-service",
+    }))
+
+    assert result.success is False
+    assert result.score == 0.0
+    assert "missing required field" in result.details[0].lower()
+
+
+# ============================================================
+# Decomposition-first
+# ============================================================
+
+def test_decomposition_plan_is_acyclic_and_topologically_valid():
     plan = Plan.model_validate({
-        "goal": "Prepare a useful launch brief",
+        "goal": "Prepare repository for release",
         "tasks": [
-            {"id": "research", "instruction": "Research the audience", "depends_on": []},
-            {"id": "risks", "instruction": "Identify launch risks", "depends_on": []},
-            {"id": "brief", "instruction": "Synthesize the launch brief", "depends_on": ["research", "risks"]},
+            {
+                "id": "gather_prs",
+                "instruction": "Fetch candidate pull requests",
+                "depends_on": [],
+            },
+            {
+                "id": "check_incidents",
+                "instruction": "Check active incidents",
+                "depends_on": [],
+            },
+            {
+                "id": "rank_release_order",
+                "instruction": "Rank release order",
+                "depends_on": [
+                    "gather_prs",
+                    "check_incidents",
+                ],
+            },
+            {
+                "id": "synthesize_release_plan",
+                "instruction": "Write final release plan",
+                "depends_on": ["rank_release_order"],
+            },
         ],
     })
-    assert plan.execution_batches() == [["research", "risks"], ["brief"]]
-    assert plan.topological_order()[-1] == "brief"
+
+    assert plan.topological_order() == [
+        "gather_prs",
+        "check_incidents",
+        "rank_release_order",
+        "synthesize_release_plan",
+    ]
+
+    assert [set(batch) for batch in plan.execution_batches()] == [
+        {"gather_prs", "check_incidents"},
+        {"rank_release_order"},
+        {"synthesize_release_plan"},
+    ]
 
 
-def test_cycle_is_rejected():
+def test_decomposition_rejects_cycle():
     with pytest.raises(ValueError, match="Cycle detected"):
         Plan.model_validate({
-            "goal": "Reject an invalid cyclic plan",
+            "goal": "Reject cyclic release plan",
             "tasks": [
-                {"id": "a", "instruction": "Perform task alpha", "depends_on": ["b"]},
-                {"id": "b", "instruction": "Perform task beta", "depends_on": ["a"]},
+                {
+                    "id": "a",
+                    "instruction": "Task A",
+                    "depends_on": ["b"],
+                },
+                {
+                    "id": "b",
+                    "instruction": "Task B",
+                    "depends_on": ["a"],
+                },
             ],
         })
 
 
-def test_executor_passes_dependency_outputs():
-    plan = Plan.model_validate({
-        "goal": "Create a concise combined report",
-        "tasks": [
-            {"id": "a", "instruction": "Collect useful evidence", "depends_on": []},
-            {"id": "b", "instruction": "Synthesize all evidence", "depends_on": ["a"]},
-        ],
-    })
-    llm = RecordingLLM()
-    outputs = execute_plan(plan, llm)
-    assert "Completed Current task: Collect useful evidence" in llm.prompts[1]
-    assert final_output(plan, outputs) == outputs["b"]
-
-
-def test_grounded_checks_are_deterministic():
-    issues = deterministic_checks("Design a phishing awareness workshop", "Too short")
-    assert len(issues) >= 2
-
-
-def good_deliverable() -> str:
-    body = " ".join(["security checklist explains structured controls and verification"] * 14)
-    return f"# Security Checklist\n- {body}"
-
-
-class SequencedEnvironment:
-    def __init__(self, feedback: list[EnvironmentFeedback]):
-        self.feedback = iter(feedback)
-
-    def evaluate(self, state: str) -> EnvironmentFeedback:
-        return next(self.feedback)
-
-
-def test_random_environment_tends_toward_good_evaluations():
-    environment = Environment(rng=random.Random(42))
-    feedback = [environment.evaluate("Any candidate") for _ in range(1_000)]
-    assert sum(item.score for item in feedback) / len(feedback) > 0.65
-    assert sum(item.success for item in feedback) / len(feedback) > 0.65
-
-
-class ReflexionLLM:
-    def __init__(self):
-        self.acting_calls = 0
-        self.second_trial_saw_memory = False
-
-    def invoke(self, messages, **kwargs):
-        system, prompt = messages[0][1], messages[-1][1]
-        if "acting agent" in system:
-            self.acting_calls += 1
-            if self.acting_calls == 1:
-                return SimpleNamespace(content="A short security answer.")
-            self.second_trial_saw_memory = "I omitted structure" in prompt
-            return SimpleNamespace(content=good_deliverable())
-        return SimpleNamespace(
-            content="I omitted structure and detail; next time I will add a checklist and verification steps."
-        )
-
-
-def test_reflexion_retries_with_bounded_memory():
-    llm = ReflexionLLM()
-    environment = SequencedEnvironment([
-        EnvironmentFeedback(success=False, score=0.3, details=["Random rejection."]),
-        EnvironmentFeedback(success=True, score=0.9),
-    ])
-    result = reflexion(
-        "Create a structured security checklist", llm, environment, max_trials=2, memory_size=1
-    )
-    assert result.success is True
-    assert len(result.trials) == 2
-    assert result.trials[0].feedback.success is False
-    assert result.trials[0].reflection.startswith("I omitted")
-    assert llm.second_trial_saw_memory is True
-    assert len(result.memory) == 1
-
-
-class LATSLLM:
-    class Structured:
-        def __init__(self, owner, schema):
-            self.owner = owner
-            self.schema = schema
-
-        def invoke(self, messages, **kwargs):
-            return self.owner.structured(self.schema)
-
+class FailingStructuredLLM:
     def with_structured_output(self, schema, *, method):
-        assert method == "json_schema"
-        return self.Structured(self, schema)
+        raise RuntimeError("structured generation failed")
 
-    def structured(self, schema):
-        if schema.__name__ == "LATSActionBatch":
-            return schema.model_validate({
-                "actions": [
-                    {"action": "minimal", "state": "Too short"},
-                    {"action": "structured", "state": good_deliverable()},
-                ]
-            })
-        return schema(score=0.8)
 
+def test_decompose_goal_uses_safe_fallback_plan():
+    llm = FailingStructuredLLM()
+
+    plan = decompose_goal(
+        "Prepare payments-service for production",
+        llm,
+        repository_name="payments-service",
+    )
+
+    task_ids = [task.id for task in plan.tasks]
+
+    assert task_ids == [
+        "gather_prs",
+        "check_incidents",
+        "check_flags",
+        "check_deploy_status",
+        "rank_release_order",
+        "synthesize_release_plan",
+    ]
+
+    assert [set(batch) for batch in plan.execution_batches()] == [
+        {
+            "gather_prs",
+            "check_incidents",
+            "check_flags",
+            "check_deploy_status",
+        },
+        {"rank_release_order"},
+        {"synthesize_release_plan"},
+    ]
+
+# ============================================================
+# Plan-and-Solve
+# ============================================================
+
+class FakePlanLLM:
     def invoke(self, messages, **kwargs):
+        assert "Plan-and-Solve" in messages[0][1]
+        assert "First understand the problem" in messages[-1][1]
+
         return SimpleNamespace(
-            content="This branch failed external length and structure checks; expand with concrete controls."
+            content=(
+                "PLAN:\n"
+                "1. Inspect the release state.\n"
+                "2. Identify blocked PRs.\n"
+                "3. Produce the release order.\n\n"
+                "SOLUTION:\n"
+                "PR #1 is ready and PR #5 is blocked by the active incident."
+            )
         )
 
 
-def test_lats_uses_external_feedback_reflection_and_backpropagation():
-    environment = SequencedEnvironment([
-        EnvironmentFeedback(success=False, score=0.2, details=["Random rejection."]),
-        EnvironmentFeedback(success=True, score=1.0),
-    ])
-    result = lats(
-        "Create a structured security checklist",
-        LATSLLM(),
-        environment,
-        iterations=1,
-        n_actions=2,
+def test_plan_and_solve_returns_plan_and_solution():
+    result = plan_and_solve(
+        "Decide whether the repository is ready for release.",
+        FakePlanLLM(),
     )
-    assert result.success is True
-    assert result.best_score == 1.0
-    assert result.root.visits == 2
-    assert result.root.children[0].reflections
-    tree = flatten_lats_tree(result.root)
-    assert len(tree) == 3
-    assert tree[1]["feedback"]["success"] is False
-    assert tree[2]["feedback"]["success"] is True
+
+    assert "PLAN:" in result
+    assert "SOLUTION:" in result
+    assert "PR #1" in result
 
 
-@pytest.mark.parametrize(
-    "schema",
-    [GeneratedPlan, DynamicDecision, ThoughtCandidates, ThoughtEvaluation, LATSActionBatch, ValueEstimate],
-)
-def test_structured_schemas_bind_with_langchain_mistral(schema):
-    chat = ChatMistralAI(api_key="test-key", model="test-model")
-    runnable = chat.with_structured_output(schema, method="json_schema")
-    assert runnable is not None
+class EmptyLLM:
+    def invoke(self, messages, **kwargs):
+        return SimpleNamespace(content="")
+
+
+def test_plan_and_solve_rejects_empty_model_response():
+    with pytest.raises(RuntimeError, match="empty"):
+        plan_and_solve(
+            "Prepare a release plan.",
+            EmptyLLM(),
+        )
+
+
+# ============================================================
+# Self-Refine
+# ============================================================
+
+def test_deterministic_checks_detect_short_unstructured_output():
+    issues = deterministic_checks(
+        "Create a structured security checklist",
+        "Too short",
+    )
+
+    assert len(issues) >= 2
+    assert any("80 words" in issue for issue in issues)
+    assert any("structure" in issue.lower() for issue in issues)
+
+
+def test_deterministic_checks_pass_good_deliverable():
+    draft = (
+        "# Security Checklist\n"
+        + "- security controls and verification steps\n" * 30
+    )
+
+    issues = deterministic_checks(
+        "Create a structured security checklist",
+        draft,
+    )
+
+    assert issues == []
+
+
+class SelfRefineLLM:
+    def __init__(self):
+        self.calls = []
+
+    def invoke(self, messages, **kwargs):
+        self.calls.append(messages)
+
+        system = messages[0][1]
+
+        if "separate critic" in system:
+            return SimpleNamespace(
+                content="The draft is too short and lacks a concrete checklist."
+            )
+
+        return SimpleNamespace(
+            content=(
+                "# Security Checklist\n"
+                + "- security controls and verification steps\n" * 30
+            )
+        )
+
+
+def test_self_refine_performs_critique_then_revision():
+    llm = SelfRefineLLM()
+
+    draft = "Too short"
+
+    result = reflect_and_refine(
+        goal="Create a structured security checklist",
+        draft=draft,
+        llm=llm,
+    )
+
+    assert result.draft == draft
+    assert result.critique
+    assert result.revised != draft
+    assert len(llm.calls) == 2
+
+    assert "security controls" in result.revised.lower()
+
+
+# ============================================================
+# CoderiftChatModel
+# ============================================================
+
+def test_coderift_chat_model_has_correct_llm_type():
+    chat = CoderiftChatModel()
+
+    assert chat._llm_type == "coderift-gemini-or-offline"
+
+
+def test_coderift_chat_model_offline_fallback(monkeypatch):
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    chat = CoderiftChatModel()
+
+    response = chat.invoke([
+        ("system", "You are a release assistant."),
+        ("human", "Check PR #1 for release readiness."),
+    ])
+
+    assert response.content
+    assert "offline fallback" in response.content
+    assert "PR #1" in response.content
+
+
+def test_coderift_structured_output_requires_live_model(monkeypatch):
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    class ExampleSchema(__import__("pydantic").BaseModel):
+        value: str
+
+    chat = CoderiftChatModel()
+
+    runnable = chat.with_structured_output(
+        ExampleSchema,
+        method="json_schema",
+    )
+
+    with pytest.raises(NoLiveModelConfigured):
+        runnable.invoke([
+            ("human", "Return a value."),
+        ])
+
+
+def test_generated_plan_schema_rejects_extra_fields():
+    with pytest.raises(Exception):
+        GeneratedPlan.model_validate({
+            "goal": "Prepare release",
+            "unexpected": "not allowed",
+            "tasks": [],
+        })
