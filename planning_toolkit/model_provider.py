@@ -53,7 +53,8 @@ def _call_google(prompt: str, system_prompt: str | None, max_tokens: int) -> str
         parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
         text = "".join(p.get("text", "") for p in parts).strip()
         return text or None
-    except (urllib.error.URLError, KeyError, IndexError, json.JSONDecodeError):
+    except Exception as exc:
+        print(f"Gemini API error: {type(exc).__name__}: {exc}")
         return None
 
 
