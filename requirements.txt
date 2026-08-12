@@ -23,3 +23,26 @@ pytest>=8.0               # memory/tests/
 # rag/vector_store/embeddings.py):
 sentence-transformers>=3.0
 langchain-huggingface>=0.1
+
+
+# Task 1 — Grounded Environment + Decomposition-First + Plan-and-Solve + Self-Refine
+# Files: environment.py, decomposition.py (decomposition_first), plan_and_solve.py, self_refine.py, model_provider.py
+
+# LLM interface (BaseChatModel/SimpleChatModel) that all these files build on —
+# langchain-mistralai is NOT needed here because model_provider.py calls the
+# Google Gemini API directly over urllib.request, matching the same pattern
+# rag/llm.py already uses elsewhere in the repo (no external SDK required)
+langchain-core>=0.3,<0.4
+
+# DAG validation (acyclicity, topological sort, execution batches) in models.py
+networkx>=3.4,<3.5
+
+# Task/Plan/EnvironmentFeedback schemas in models.py + structured outputs
+pydantic>=2.7,<3
+
+# Loads GOOGLE_API_KEY / GEMINI_API_KEY from .env in model_provider.py
+python-dotenv>=1.0,<2
+
+# Unit tests (should be updated to cover the new grounded Environment
+# instead of the old assumption that Environment is randomized)
+pytest>=8,<9
