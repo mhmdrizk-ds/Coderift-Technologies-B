@@ -1,0 +1,34 @@
+{
+  "case": {
+    "id": "ambiguous_target_two_candidates",
+    "task_description": "An on-call engineer needs to roll back a deployment for further verification.",
+    "deployment_ids": [
+      1,
+      2
+    ],
+    "max_trials": 3,
+    "expects_success": true,
+    "expects_trials_to_succeed": 2,
+    "why": "The 'a single retry isn't enough, only cross-trial memory helps' case per the lab's required suite composition. Deployment #1 (the naive first guess) is Failed; only after carrying that specific lesson into a brand-new full attempt does trial 2 correctly target deployment #2. Self-Refine's scope (revise the SAME draft) can't do this \u2014 the whole action (a different deployment_id) has to be re-proposed."
+  },
+  "trace": {
+    "output": "{\"action\": \"rollback_deployment\", \"deployment_id\": 2}",
+    "trial_count": 2,
+    "trials": [
+      {
+        "number": 1,
+        "attempt": "{\"action\": \"rollback_deployment\", \"deployment_id\": 1}",
+        "success": false,
+        "score": 0.0,
+        "reflection": "I picked deployment #1 (status 'Failed') without checking whether its status allows a rollback. External feedback: Deployment #1 is 'Failed'; only a Succeeded or InProgress deployment can be rolled back.. Next trial, I should only propose a deployment whose status is Succeeded or InProgress."
+      },
+      {
+        "number": 2,
+        "attempt": "{\"action\": \"rollback_deployment\", \"deployment_id\": 2}",
+        "success": true,
+        "score": 1.0,
+        "reflection": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case": {
+    "id": "ambiguous_pending_scan_larger_set",
+    "repository_name": "checkout-web",
+    "candidate_pull_request_ids": [
+      2,
+      6
+    ],
+    "expects_method": "tree_of_thoughts",
+    "why": "Same ambiguous PR, run a second time to check ToT's search is stable (same winning strategy, comparable score) rather than noisy \u2014 a real reliability question before shipping ToT as the routed default."
+  },
+  "trace": {
+    "winner": "RELEASE ORDER for checkout-web\nStrategy: include_with_caveat\nPR #6 (Add saved-address autofill to checkout) is Approved by a human reviewer; its security scan is still Pending, not Failed. Include PR #6 in this release, but hold the deploy until the scan resolves \u2014 treat 'Pending' as 'not yet blocking' rather than 'blocking', since a human has already signed off on the change.\nPR #2 (Approved, scan Failed) is BLOCKED \u2014 not release-ready.\n\n[refinement] Escalation note added: notify the release manager that PR #6's scan status should be re-checked before this release ships, regardless of which stance was taken.",
+    "model_self_score": 1.0,
+    "grounded_score": 1.0,
+    "search_trace": [
+      {
+        "round": 0,
+        "state": "RELEASE ORDER for checkout-web\nStrategy: include_with_caveat\nPR #6 (Add saved-address autofill to checkout) is Approved by a human reviewer; its security scan is still Pending, not Failed. Include PR #6 in this release, but hold the deploy until the scan resolves \u2014 treat 'Pending' as 'not yet blocking' rather than 'blocking', since a human has already signed off on the change.\nPR #2 (Approved, scan Failed) is BLOCKED \u2014 not release-ready.",
+        "score": 1.0,
+        "rationale": "[offline self-eval] mentions 2/2 candidate PRs by id; names an explicit stance on the ambiguous PR #6."
+      },
+      {
+        "round": 0,
+        "state": "RELEASE ORDER for checkout-web\nStrategy: exclude_until_resolved\nPR #6 (Add saved-address autofill to checkout) is Approved but its security scan is still Pending. BLOCK PR #6 from this release until the scan reports Passed \u2014 a Pending scan carries the same uncertainty as an unknown result, and shipping code whose scan hasn't finished is a real production risk regardless of reviewer sign-off.\nPR #2 (Approved, scan Failed) is BLOCKED \u2014 not release-ready.",
+        "score": 0.9,
+        "rationale": "[offline self-eval] mentions 2/2 candidate PRs by id; names an explicit stance on the ambiguous PR #6. Mildly penalized for discarding the human reviewer's Approved sign-off entirely."
+      },
+      {
+        "round": 0,
+        "state": "RELEASE ORDER for checkout-web\nStrategy: escalate_for_manual_review\nPR #6 (Add saved-address autofill to checkout) is Approved with a Pending scan. Do not decide automatically either way \u2014 escalate PR #6 to a human release manager for an explicit call before this release proceeds, and proceed with every other candidate PR on the ordinary ready/blocked rule in the meantime.\nPR #2 (Approved, scan Failed) is BLOCKED \u2014 not release-ready.",
+        "score": 0.8,
+        "rationale": "[offline self-eval] mentions 2/2 candidate PRs by id; names an explicit stance on the ambiguous PR #6. Penalized for deferring the decision rather than committing to a release order."
+      },
+      {
+        "round": 1,
+        "state": "RELEASE ORDER for checkout-web\nStrategy: include_with_caveat\nPR #6 (Add saved-address autofill to checkout) is Approved by a human reviewer; its security scan is still Pending, not Failed. Include PR #6 in this release, but hold the deploy until the scan resolves \u2014 treat 'Pending' as 'not yet blocking' rather than 'blocking', since a human has already signed off on the change.\nPR #2 (Approved, scan Failed) is BLOCKED \u2014 not release-ready.\n\n[refinement] Escalation note added: notify the release manager that PR #6's scan status should be re-checked before this release ships, regardless of which stance was taken.",
+        "score": 1.0,
+        "rationale": "[offline self-eval] mentions 2/2 candidate PRs by id; names an explicit stance on the ambiguous PR #6.",
+        "refined_from_score": 1.0
+      }
+    ]
+  }
+}

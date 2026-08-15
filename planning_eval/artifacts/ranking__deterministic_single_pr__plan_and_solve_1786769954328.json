@@ -1,0 +1,16 @@
+{
+  "case": {
+    "id": "deterministic_single_pr",
+    "repository_name": "payments-service",
+    "candidate_pull_request_ids": [
+      1
+    ],
+    "expects_method": "plan_and_solve",
+    "why": "One Approved+Passed PR, no ambiguity \u2014 the routing table should choose Plan-and-Solve, not pay for a ToT search with nothing genuine to compare."
+  },
+  "trace": {
+    "draft": "[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nRank release order for repository 'payments-service', candidate PRs #1.\n\nFirst understand the problem and devise a plan to solve it. Then carry out the\nplan step by step. Check calculations and common-sense assumptions.",
+    "revised": "[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nGoal: Rank release order for repository 'payments-service', candidate PRs #1.\n\nDraft:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nRank release order for repository 'payments-service', candidate PRs #1.\n\nFirst understand the problem and devise a plan to solve it. Then carry out the\nplan step by step. Check calculations and common-sense assumptions.\n\nGrounded checks:\n- Grounded checks passed.\n\nCritique:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nGoal: Rank release order for repository 'payments-service', candidate PRs #1.\nRubric: correctness, completeness, internal consistency, and instruction adherence.\nExternal grounded checks (from the real Coderift database):\n- Grounded checks passed.\n\nDraft:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nRank release order for repository 'payments-service', candidate PRs #1.\n\nFirst understand the problem and devise a plan to solve it. Then carry out the\nplan step by step. Check calculations and common-sense assumptions.\n\nList concrete issues. If there are none, respond exactly PASS.\n\nReturn only the improved deliverable.",
+    "grounded_issues": []
+  }
+}

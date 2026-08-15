@@ -48,18 +48,30 @@ def _grounded_release_plan_checks(
 
 
 @dataclass
-class ReflectionResult:
+class ReflectionRound:
     draft: str
     critique: str
     revised: str
     grounded_issues: list[str]
 
 
-def reflect_and_refine(
+@dataclass
+class ReflectionResult:
+    draft: str
+    critique: str
+    revised: str
+    grounded_issues: list[str]
+    rounds: list[ReflectionRound]
+
+    @property
+    def iterations(self) -> int:
+        return len(self.rounds)
+
+
+def _one_round(
     goal: str, draft: str, llm: BaseChatModel,
-    repository_name: str | None = None,
-    candidate_pull_request_ids: list[int] | None = None,
-) -> ReflectionResult:
+    repository_name: str | None, candidate_pull_request_ids: list[int] | None,
+) -> ReflectionRound:
     grounded = deterministic_checks(goal, draft, repository_name, candidate_pull_request_ids)
     grounded_report = "\n".join(f"- {issue}" for issue in grounded) or "- Grounded checks passed."
     critique_response = llm.invoke([
@@ -92,4 +104,37 @@ List concrete issues. If there are none, respond exactly PASS."""),
         if not isinstance(revised, str) or not revised.strip():
             raise RuntimeError("The chat model returned an empty or unsupported response")
         revised = revised.strip()
-    return ReflectionResult(draft=draft, critique=critique, revised=revised, grounded_issues=grounded)
+    return ReflectionRound(draft=draft, critique=critique, revised=revised, grounded_issues=grounded)
+
+
+def reflect_and_refine(
+    goal: str, draft: str, llm: BaseChatModel,
+    repository_name: str | None = None,
+    candidate_pull_request_ids: list[int] | None = None,
+    max_iterations: int = 1,
+) -> ReflectionResult:
+    """One draft, one grounded+model critique, one revision — repeated up to
+    `max_iterations` times, stopping early the moment a round both passes the
+    grounded checks AND the independent critic says PASS. `max_iterations=1`
+    (the default) reproduces the original single-pass Self-Refine behavior
+    exactly; sub-tasks that are cheap to redo (e.g. an incident summary
+    draft) can afford `max_iterations>1` to converge further."""
+    if max_iterations < 1:
+        raise ValueError("max_iterations must be positive")
+    rounds: list[ReflectionRound] = []
+    current_draft = draft
+    for _ in range(max_iterations):
+        round_result = _one_round(goal, current_draft, llm, repository_name, candidate_pull_request_ids)
+        rounds.append(round_result)
+        current_draft = round_result.revised
+        converged = (
+            not round_result.grounded_issues
+            and round_result.critique.strip().upper() == "PASS"
+        )
+        if converged:
+            break
+    last = rounds[-1]
+    return ReflectionResult(
+        draft=draft, critique=last.critique, revised=last.revised,
+        grounded_issues=last.grounded_issues, rounds=rounds,
+    )

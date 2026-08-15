@@ -1,0 +1,166 @@
+{
+  "cases": [
+    {
+      "case_id": "clean_control",
+      "repository_name": "payments-service",
+      "candidate_pull_request_ids": [
+        1
+      ],
+      "expected_signal": "none (Approved+Passed PR, no open incident)",
+      "expected_short_circuit": false,
+      "actual_short_circuit": false,
+      "matched_expectation": true,
+      "decomposition_first": {
+        "total_step_count": 6,
+        "llm_call_count": 3,
+        "total_tokens": 3727,
+        "input_tokens": 1868,
+        "output_tokens": 1859,
+        "total_latency_seconds": 0.0001,
+        "total_context_chars": 7477,
+        "max_single_prompt_chars": 3902,
+        "context_size_method": "total_context_chars sums every call's raw input character length across the run (not derived from input_tokens); max_single_prompt_chars is the largest single call's input length."
+      },
+      "dynamic_decomposition": {
+        "total_step_count": 6,
+        "topological_order": [
+          "check_incidents",
+          "gather_prs",
+          "check_flags",
+          "check_deploy_status",
+          "rank_release_order",
+          "synthesize_release_plan"
+        ],
+        "decisions": [
+          {
+            "after_observing": "check_incidents",
+            "observation_summary": "no open high/critical incident for this repository",
+            "next_step_chosen": "gather_prs next, to find out whether any candidate PR is even plausibly ready before deciding whether checking feature flags is worth it."
+          },
+          {
+            "after_observing": "gather_prs",
+            "observation_summary": "at least one candidate PR is Approved or Merged \u2014 a genuine release decision is still live",
+            "next_step_chosen": "check_flags, then check_deploy_status, then run the full ranking pass \u2014 the same work decomposition-first always does, because here there is genuinely nothing to short-circuit."
+          }
+        ],
+        "llm_call_count": 5,
+        "total_tokens": 9452,
+        "input_tokens": 4728,
+        "output_tokens": 4724,
+        "total_latency_seconds": 0.0002,
+        "total_context_chars": 18918,
+        "max_single_prompt_chars": 7990,
+        "context_size_method": "total_context_chars sums every call's raw input character length across the run (not derived from input_tokens); max_single_prompt_chars is the largest single call's input length."
+      },
+      "step_count_delta": 0,
+      "token_delta": -5725,
+      "context_chars_delta": -11441
+    },
+    {
+      "case_id": "open_incident",
+      "repository_name": "billing-worker",
+      "candidate_pull_request_ids": [
+        5
+      ],
+      "expected_signal": "open critical incident",
+      "expected_short_circuit": true,
+      "actual_short_circuit": true,
+      "matched_expectation": true,
+      "decomposition_first": {
+        "total_step_count": 6,
+        "llm_call_count": 3,
+        "total_tokens": 4293,
+        "input_tokens": 2152,
+        "output_tokens": 2141,
+        "total_latency_seconds": 0.0001,
+        "total_context_chars": 8611,
+        "max_single_prompt_chars": 4468,
+        "context_size_method": "total_context_chars sums every call's raw input character length across the run (not derived from input_tokens); max_single_prompt_chars is the largest single call's input length."
+      },
+      "dynamic_decomposition": {
+        "total_step_count": 4,
+        "topological_order": [
+          "check_incidents",
+          "gather_prs",
+          "flag_blocked_by_incident",
+          "synthesize_release_plan"
+        ],
+        "decisions": [
+          {
+            "after_observing": "check_incidents",
+            "observation_summary": "open critical incident #1 ('Invoice queries returning stale cached totals')",
+            "next_step_chosen": "gather_prs (to name the blocked PRs), then short-circuit directly to flag_blocked_by_incident \u2014 SKIPPING check_flags and check_deploy_status (irrelevant once the release is blocked outright) and SKIPPING the full rank_release_order reasoning pass (nothing left to rank)."
+          }
+        ],
+        "llm_call_count": 5,
+        "total_tokens": 7517,
+        "input_tokens": 3770,
+        "output_tokens": 3747,
+        "total_latency_seconds": 0.0001,
+        "total_context_chars": 15091,
+        "max_single_prompt_chars": 6426,
+        "context_size_method": "total_context_chars sums every call's raw input character length across the run (not derived from input_tokens); max_single_prompt_chars is the largest single call's input length."
+      },
+      "step_count_delta": 2,
+      "token_delta": -3224,
+      "context_chars_delta": -6480
+    },
+    {
+      "case_id": "failed_scan_no_incident",
+      "repository_name": "checkout-web",
+      "candidate_pull_request_ids": [
+        2
+      ],
+      "expected_signal": "Failed security scan on an Approved PR, no open incident (current short-circuit rules don't fire on this signal alone \u2014 see module docstring)",
+      "expected_short_circuit": false,
+      "actual_short_circuit": false,
+      "matched_expectation": true,
+      "decomposition_first": {
+        "total_step_count": 6,
+        "llm_call_count": 3,
+        "total_tokens": 3493,
+        "input_tokens": 1751,
+        "output_tokens": 1742,
+        "total_latency_seconds": 0.0001,
+        "total_context_chars": 7009,
+        "max_single_prompt_chars": 3666,
+        "context_size_method": "total_context_chars sums every call's raw input character length across the run (not derived from input_tokens); max_single_prompt_chars is the largest single call's input length."
+      },
+      "dynamic_decomposition": {
+        "total_step_count": 6,
+        "topological_order": [
+          "check_incidents",
+          "gather_prs",
+          "check_flags",
+          "check_deploy_status",
+          "rank_release_order",
+          "synthesize_release_plan"
+        ],
+        "decisions": [
+          {
+            "after_observing": "check_incidents",
+            "observation_summary": "no open high/critical incident for this repository",
+            "next_step_chosen": "gather_prs next, to find out whether any candidate PR is even plausibly ready before deciding whether checking feature flags is worth it."
+          },
+          {
+            "after_observing": "gather_prs",
+            "observation_summary": "at least one candidate PR is Approved or Merged \u2014 a genuine release decision is still live",
+            "next_step_chosen": "check_flags, then check_deploy_status, then run the full ranking pass \u2014 the same work decomposition-first always does, because here there is genuinely nothing to short-circuit."
+          }
+        ],
+        "llm_call_count": 5,
+        "total_tokens": 8858,
+        "input_tokens": 4431,
+        "output_tokens": 4427,
+        "total_latency_seconds": 0.0001,
+        "total_context_chars": 17730,
+        "max_single_prompt_chars": 7510,
+        "context_size_method": "total_context_chars sums every call's raw input character length across the run (not derived from input_tokens); max_single_prompt_chars is the largest single call's input length."
+      },
+      "step_count_delta": 0,
+      "token_delta": -5365,
+      "context_chars_delta": -10721
+    }
+  ],
+  "timestamp": 1786753107
+}

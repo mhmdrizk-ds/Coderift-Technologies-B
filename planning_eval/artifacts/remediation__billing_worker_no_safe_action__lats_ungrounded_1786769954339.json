@@ -1,0 +1,15 @@
+{
+  "case": {
+    "id": "billing_worker_no_safe_action",
+    "repository_name": "billing-worker",
+    "deployment_id": 1,
+    "expects_success_grounded": false,
+    "expects_success_ungrounded": true,
+    "why": "THE required grounded-vs-ungrounded contrast case. Deployment #1 is Failed (can't be rolled back) AND billing-worker has an open critical incident (blocks deploy_pr too) \u2014 no automated action is actually safe. The grounded Environment must correctly report failure; UngroundedEnvironment (deliberately fake, scores JSON-shaped text ~0.55-0.9 regardless of DB state) is expected to falsely report the invalid rollback as successful. This is the concrete failure case the lab's 'Grounded vs. ungrounded critique' section requires."
+  },
+  "trace": {
+    "output": "{\"action\": \"rollback_deployment\", \"deployment_id\": 1}",
+    "best_score": 0.9365,
+    "iterations": 1
+  }
+}
