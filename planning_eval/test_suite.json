@@ -1,0 +1,93 @@
+{
+  "_notes": "Fixed once evaluation started per the lab's guardrail ('keep your planning test suite fixed once you start evaluating'). Every case is a real request shape against the real db/coderift.db seed data — no synthetic three-step to-do items. repository/pr/deployment ids reference db/seed.sql.",
+
+  "decomposition_cases": [
+    {
+      "id": "clean_control",
+      "goal": "Prepare repository 'payments-service' for a production release.",
+      "repository_name": "payments-service",
+      "candidate_pull_request_ids": [1],
+      "expects": "no_short_circuit",
+      "why": "No open incident, one clean Approved+Passed PR. Baseline case: decomposition-first and dynamic decomposition should do the same real work, so this case measures the OVERHEAD of dynamic decomposition's re-planning when there's nothing to react to."
+    },
+    {
+      "id": "open_incident",
+      "goal": "Prepare repository 'billing-worker' for a production release.",
+      "repository_name": "billing-worker",
+      "candidate_pull_request_ids": [5],
+      "expects": "short_circuit",
+      "why": "billing-worker has an OPEN critical incident (see db/seed.sql). Dynamic decomposition should discover this after its first observation and skip straight to a BLOCKED release plan instead of blindly running the full pipeline decomposition-first would have queued up front — this is the real divergence case the lab requires."
+    },
+    {
+      "id": "failed_scan_no_incident",
+      "goal": "Prepare repository 'checkout-web' for a production release.",
+      "repository_name": "checkout-web",
+      "candidate_pull_request_ids": [2],
+      "expects": "no_short_circuit",
+      "why": "No open incident for checkout-web (its one incident is resolved), but the candidate PR's latest scan is Failed — nothing to short-circuit on incident detection, but the final synthesis must correctly flag the PR as BLOCKED rather than approving it. Tests that dynamic decomposition doesn't over-fire its short-circuit heuristic on a non-incident blocker."
+    }
+  ],
+
+  "ranking_cases": [
+    {
+      "id": "deterministic_single_pr",
+      "repository_name": "payments-service",
+      "candidate_pull_request_ids": [1],
+      "expects_method": "plan_and_solve",
+      "why": "One Approved+Passed PR, no ambiguity — the routing table should choose Plan-and-Solve, not pay for a ToT search with nothing genuine to compare."
+    },
+    {
+      "id": "ambiguous_pending_scan",
+      "repository_name": "checkout-web",
+      "candidate_pull_request_ids": [2, 6],
+      "expects_method": "tree_of_thoughts",
+      "why": "PR #6 is Approved with a still-Pending scan — the genuinely ambiguous case with no single correct answer. Routing table should choose Tree of Thoughts."
+    },
+    {
+      "id": "ambiguous_pending_scan_larger_set",
+      "repository_name": "checkout-web",
+      "candidate_pull_request_ids": [2, 6],
+      "expects_method": "tree_of_thoughts",
+      "why": "Same ambiguous PR, run a second time to check ToT's search is stable (same winning strategy, comparable score) rather than noisy — a real reliability question before shipping ToT as the routed default."
+    }
+  ],
+
+  "remediation_cases": [
+    {
+      "id": "billing_worker_no_safe_action",
+      "repository_name": "billing-worker",
+      "deployment_id": 1,
+      "expects_success_grounded": false,
+      "expects_success_ungrounded": true,
+      "why": "THE required grounded-vs-ungrounded contrast case. Deployment #1 is Failed (can't be rolled back) AND billing-worker has an open critical incident (blocks deploy_pr too) — no automated action is actually safe. The grounded Environment must correctly report failure; UngroundedEnvironment (deliberately fake, scores JSON-shaped text ~0.55-0.9 regardless of DB state) is expected to falsely report the invalid rollback as successful. This is the concrete failure case the lab's 'Grounded vs. ungrounded critique' section requires."
+    },
+    {
+      "id": "payments_service_valid_rollback",
+      "repository_name": "payments-service",
+      "deployment_id": 2,
+      "expects_success_grounded": true,
+      "expects_success_ungrounded": true,
+      "why": "A genuinely valid target (Succeeded staging deployment, no incident). Both evaluators should agree here — this is the control that shows the contrast case above is about grounding, not just 'ungrounded always says yes'."
+    }
+  ],
+
+  "reflexion_cases": [
+    {
+      "id": "ambiguous_target_two_candidates",
+      "task_description": "An on-call engineer needs to roll back a deployment for further verification.",
+      "deployment_ids": [1, 2],
+      "max_trials": 3,
+      "expects_success": true,
+      "expects_trials_to_succeed": 2,
+      "why": "The 'a single retry isn't enough, only cross-trial memory helps' case per the lab's required suite composition. Deployment #1 (the naive first guess) is Failed; only after carrying that specific lesson into a brand-new full attempt does trial 2 correctly target deployment #2. Self-Refine's scope (revise the SAME draft) can't do this — the whole action (a different deployment_id) has to be re-proposed."
+    },
+    {
+      "id": "no_valid_target_honest_negative",
+      "task_description": "Roll back the billing-worker deployment tied to the open incident.",
+      "deployment_ids": [1],
+      "max_trials": 3,
+      "expects_success": false,
+      "why": "Only one candidate exists and it is genuinely never rollback-eligible while the incident stays open. Tests that Reflexion returns the best-scoring (not a fabricated-successful) attempt after exhausting max_trials — an honest negative result, matching this repo's existing mini_suite convention of reporting real findings rather than smoothing them over."
+    }
+  ]
+}

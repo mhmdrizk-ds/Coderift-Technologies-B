@@ -1,0 +1,15 @@
+{
+  "case": {
+    "id": "payments_service_valid_rollback",
+    "repository_name": "payments-service",
+    "deployment_id": 2,
+    "expects_success_grounded": true,
+    "expects_success_ungrounded": true,
+    "why": "A genuinely valid target (Succeeded staging deployment, no incident). Both evaluators should agree here \u2014 this is the control that shows the contrast case above is about grounding, not just 'ungrounded always says yes'."
+  },
+  "trace": {
+    "output": "{\"action\": \"rollback_deployment\", \"deployment_id\": 2}",
+    "best_score": 0.8805,
+    "iterations": 1
+  }
+}

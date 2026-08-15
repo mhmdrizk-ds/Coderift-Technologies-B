@@ -50,7 +50,15 @@ VALUES
 --    Failed and produced the seeded critical incident).
 (3, 'Add caching layer for invoice queries',
     'Adds an in-memory cache in front of the invoice lookup query.',
-    3, 'Merged', 4);
+    3, 'Merged', 4),
+-- 6: reviewed and approved by a human, but its scan (below) is still
+--    Pending, not Failed and not Passed -> the genuinely ambiguous case
+--    the Decomposition & Planning lab's Tree of Thoughts routing needs
+--    (see planning_toolkit/README.md, "Why Tree of Thoughts"). Additive
+--    only: does not renumber or touch PRs 1-5.
+(2, 'Add saved-address autofill to checkout',
+    'Lets returning customers autofill a saved shipping address at checkout.',
+    1, 'Approved', 3);
 
 INSERT INTO security_scans (pull_request_id, status, scan_type)
 VALUES
@@ -58,7 +66,8 @@ VALUES
 (2, 'Failed', 'SAST'),   -- PR 2: Failed  (required edge case: a Failed scan)
 (3, 'Pending', 'SAST'),  -- PR 3: Pending (required edge case: a Pending scan)
 (4, 'Failed', 'Dependency'),
-(5, 'Passed', 'SAST');
+(5, 'Passed', 'SAST'),
+(6, 'Pending', 'SAST');  -- PR 6: Approved status but Pending scan (ambiguous ToT case)
 
 -- deployment #1: a Failed production deploy that triggered the seeded
 -- critical incident (required edge case). deployment #2: a routine

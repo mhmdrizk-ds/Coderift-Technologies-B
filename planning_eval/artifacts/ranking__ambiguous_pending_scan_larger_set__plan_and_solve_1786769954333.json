@@ -1,0 +1,20 @@
+{
+  "case": {
+    "id": "ambiguous_pending_scan_larger_set",
+    "repository_name": "checkout-web",
+    "candidate_pull_request_ids": [
+      2,
+      6
+    ],
+    "expects_method": "tree_of_thoughts",
+    "why": "Same ambiguous PR, run a second time to check ToT's search is stable (same winning strategy, comparable score) rather than noisy \u2014 a real reliability question before shipping ToT as the routed default."
+  },
+  "trace": {
+    "draft": "[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nRank release order for repository 'checkout-web', candidate PRs #2, #6.\n\nFirst understand the problem and devise a plan to solve it. Then carry out the\nplan step by step. Check calculations and common-sense assumptions.",
+    "revised": "[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nGoal: Rank release order for repository 'checkout-web', candidate PRs #2, #6.\n\nDraft:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nRank release order for repository 'checkout-web', candidate PRs #2, #6.\n\nFirst understand the problem and devise a plan to solve it. Then carry out the\nplan step by step. Check calculations and common-sense assumptions.\n\nGrounded checks:\n- PR #2 is not release-ready (scan/status not clean) but the draft doesn't clearly flag it as blocked.\n- PR #6 is not release-ready (scan/status not clean) but the draft doesn't clearly flag it as blocked.\n\nCritique:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nGoal: Rank release order for repository 'checkout-web', candidate PRs #2, #6.\nRubric: correctness, completeness, internal consistency, and instruction adherence.\nExternal grounded checks (from the real Coderift database):\n- PR #2 is not release-ready (scan/status not clean) but the draft doesn't clearly flag it as blocked.\n- PR #6 is not release-ready (scan/status not clean) but the draft doesn't clearly flag it as blocked.\n\nDraft:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nRank release order for repository 'checkout-web', candidate PRs #2, #6.\n\nFirst understand the problem and devise a plan to solve it. Then carry out the\nplan step by step. Check calculations and common-sense assumptions.\n\nList concrete issues. If there are none, respond exactly PASS.\n\nReturn only the improved deliverable.",
+    "grounded_issues": [
+      "PR #2 is not release-ready (scan/status not clean) but the draft doesn't clearly flag it as blocked.",
+      "PR #6 is not release-ready (scan/status not clean) but the draft doesn't clearly flag it as blocked."
+    ]
+  }
+}

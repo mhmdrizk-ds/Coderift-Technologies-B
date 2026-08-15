@@ -1,0 +1,93 @@
+{
+  "agent": "release_readiness_planning",
+  "method": "decomposition_first",
+  "repository_name": "billing-worker",
+  "candidate_pull_request_ids": [
+    5
+  ],
+  "plan": {
+    "goal": "Prepare repository 'billing-worker' for a production release.",
+    "tasks": [
+      {
+        "id": "gather_prs",
+        "instruction": "Fetch every candidate pull request's status and latest security scan via get_pull_request.",
+        "depends_on": []
+      },
+      {
+        "id": "check_incidents",
+        "instruction": "List open incidents for the repository via list_active_incidents.",
+        "depends_on": []
+      },
+      {
+        "id": "check_flags",
+        "instruction": "List feature flags for the repository via list_feature_flags.",
+        "depends_on": []
+      },
+      {
+        "id": "check_deploy_status",
+        "instruction": "Check the current production deployment status via check_deployment_status.",
+        "depends_on": []
+      },
+      {
+        "id": "rank_release_order",
+        "instruction": "Given the gathered facts, decide the release order and flag anything not ready.",
+        "depends_on": [
+          "gather_prs",
+          "check_incidents",
+          "check_flags",
+          "check_deploy_status"
+        ]
+      },
+      {
+        "id": "synthesize_release_plan",
+        "instruction": "Write the final release plan and run it through a grounded Self-Refine pass before returning it.",
+        "depends_on": [
+          "rank_release_order"
+        ]
+      }
+    ]
+  },
+  "topological_order": [
+    "gather_prs",
+    "check_incidents",
+    "check_flags",
+    "check_deploy_status",
+    "rank_release_order",
+    "synthesize_release_plan"
+  ],
+  "execution_batches": [
+    [
+      "check_deploy_status",
+      "check_flags",
+      "check_incidents",
+      "gather_prs"
+    ],
+    [
+      "rank_release_order"
+    ],
+    [
+      "synthesize_release_plan"
+    ]
+  ],
+  "node_outputs": {
+    "check_deploy_status": "{\n  \"repository_name\": \"billing-worker\",\n  \"environment_name\": \"production\",\n  \"deployment\": {\n    \"deployment_id\": 1,\n    \"status\": \"Failed\",\n    \"deployed_by\": \"Priya Raman\",\n    \"pull_request_title\": \"Add caching layer for invoice queries\",\n    \"created_at\": \"2026-08-15 08:13:36\",\n    \"notes\": \"Cache invalidation bug caused stale invoice totals to be served.\"\n  }\n}",
+    "check_flags": "{\n  \"repository_name\": \"billing-worker\",\n  \"feature_flags\": [\n    {\n      \"name\": \"invoice-cache-layer\",\n      \"environment_name\": \"production\",\n      \"enabled\": true\n    }\n  ]\n}",
+    "check_incidents": "{\"open_incident\": {\"incident_id\": 1, \"title\": \"Invoice queries returning stale cached totals\", \"severity\": \"critical\", \"created_at\": \"2026-08-15 08:13:36\", \"deployment_id\": 1, \"repository_name\": \"billing-worker\", \"environment_name\": \"production\"}}",
+    "gather_prs": "{\"pull_requests\": [{\"pull_request_id\": 5, \"repository_name\": \"billing-worker\", \"title\": \"Add caching layer for invoice queries\", \"description\": \"Adds an in-memory cache in front of the invoice lookup query.\", \"author\": \"Ines Duarte\", \"status\": \"Merged\", \"latest_security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-08-15 08:13:36\"}, \"created_at\": \"2026-08-15 08:13:36\"}]}",
+    "rank_release_order": "[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nRepository: billing-worker\nGathered facts (from the real Coderift database): {\"repository_name\": \"billing-worker\", \"gather_prs\": {\"pull_requests\": [{\"pull_request_id\": 5, \"repository_name\": \"billing-worker\", \"title\": \"Add caching layer for invoice queries\", \"description\": \"Adds an in-memory cache in front of the invoice lookup query.\", \"author\": \"Ines Duarte\", \"status\": \"Merged\", \"latest_security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-08-15 08:13:36\"}, \"created_at\": \"2026-08-15 08:13:36\"}]}, \"check_incidents\": {\"open_incident\": {\"incident_id\": 1, \"title\": \"Invoice queries returning stale cached totals\", \"severity\": \"critical\", \"created_at\": \"2026-08-15 08:13:36\", \"deployment_id\": 1, \"repository_name\": \"billing-worker\", \"environment_name\": \"production\"}}, \"check_flags\": {\"repository_name\": \"billing-worker\", \"feature_flags\": [{\"name\": \"invoice-cache-layer\", \"environment_name\": \"production\", \"enabled\": true}]}, \"check_deploy_status\": {\"repository_name\": \"billing-worker\", \"environment_name\": \"production\", \"deployment\": {\"deployment_id\": 1, \"status\": \"Failed\", \"deployed_by\": \"Priya Raman\", \"pull_request_title\": \"Add caching layer for invoice queries\", \"created_at\": \"2026-08-15 08:13:36\", \"notes\": \"Cache invalidation bug caused stale invoice totals to be served.\"}}}\n\nDecide which PRs are release-ready (Approved/Merged status AND a Passed latest security scan), whether an open incident should pause the release, and produce the release order plus a BLOCKED list.\n\nFirst understand the problem and devise a plan to solve it. Then carry out the\nplan step by step. Check calculations and common-sense assumptions.",
+    "synthesize_release_plan": "[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nGoal: Prepare repository 'billing-worker' for a production release.\n\nDraft:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nRepository: billing-worker\nGathered facts (from the real Coderift database): {\"repository_name\": \"billing-worker\", \"gather_prs\": {\"pull_requests\": [{\"pull_request_id\": 5, \"repository_name\": \"billing-worker\", \"title\": \"Add caching layer for invoice queries\", \"description\": \"Adds an in-memory cache in front of the invoice lookup query.\", \"author\": \"Ines Duarte\", \"status\": \"Merged\", \"latest_security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-08-15 08:13:36\"}, \"created_at\": \"2026-08-15 08:13:36\"}]}, \"check_incidents\": {\"open_incident\": {\"incident_id\": 1, \"title\": \"Invoice queries returning stale cached totals\", \"severity\": \"critical\", \"created_at\": \"2026-08-15 08:13:36\", \"deployment_id\": 1, \"repository_name\": \"billing-worker\", \"environment_name\": \"production\"}}, \"check_flags\": {\"repository_name\": \"billing-worker\", \"feature_flags\": [{\"name\": \"invoice-cache-layer\", \"environment_name\": \"production\", \"enabled\": true}]}, \"check_deploy_status\": {\"repository_name\": \"billing-worker\", \"environment_name\": \"production\", \"deployment\": {\"deployment_id\": 1, \"status\": \"Failed\", \"deployed_by\": \"Priya Raman\", \"pull_request_title\": \"Add caching layer for invoice queries\", \"created_at\": \"2026-08-15 08:13:36\", \"notes\": \"Cache invalidation bug caused stale invoice totals to be served.\"}}}\n\nDecide which PRs are release-ready (Approved/Merged status AND a Passed latest security scan), whether an open incident should pause the release, and produce the release order plus a BLOCKED list.\n\nFirst understand the problem and devise a plan to solve it. Then carry out the\nplan step by step. Check calculations and common-sense assumptions.\n\nGrounded checks:\n- The deliverable has no visible structure (headings or list items).\n\nCritique:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nGoal: Prepare repository 'billing-worker' for a production release.\nRubric: correctness, completeness, internal consistency, and instruction adherence.\nExternal grounded checks (from the real Coderift database):\n- The deliverable has no visible structure (headings or list items).\n\nDraft:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nRepository: billing-worker\nGathered facts (from the real Coderift database): {\"repository_name\": \"billing-worker\", \"gather_prs\": {\"pull_requests\": [{\"pull_request_id\": 5, \"repository_name\": \"billing-worker\", \"title\": \"Add caching layer for invoice queries\", \"description\": \"Adds an in-memory cache in front of the invoice lookup query.\", \"author\": \"Ines Duarte\", \"status\": \"Merged\", \"latest_security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-08-15 08:13:36\"}, \"created_at\": \"2026-08-15 08:13:36\"}]}, \"check_incidents\": {\"open_incident\": {\"incident_id\": 1, \"title\": \"Invoice queries returning stale cached totals\", \"severity\": \"critical\", \"created_at\": \"2026-08-15 08:13:36\", \"deployment_id\": 1, \"repository_name\": \"billing-worker\", \"environment_name\": \"production\"}}, \"check_flags\": {\"repository_name\": \"billing-worker\", \"feature_flags\": [{\"name\": \"invoice-cache-layer\", \"environment_name\": \"production\", \"enabled\": true}]}, \"check_deploy_status\": {\"repository_name\": \"billing-worker\", \"environment_name\": \"production\", \"deployment\": {\"deployment_id\": 1, \"status\": \"Failed\", \"deployed_by\": \"Priya Raman\", \"pull_request_title\": \"Add caching layer for invoice queries\", \"created_at\": \"2026-08-15 08:13:36\", \"notes\": \"Cache invalidation bug caused stale invoice totals to be served.\"}}}\n\nDecide which PRs are release-ready (Approved/Merged status AND a Passed latest security scan), whether an open incident should pause the release, and produce the release order plus a BLOCKED list.\n\nFirst understand the problem and devise a plan to solve it. Then carry out the\nplan step by step. Check calculations and common-sense assumptions.\n\nList concrete issues. If there are none, respond exactly PASS.\n\nReturn only the improved deliverable."
+  },
+  "final_output": "[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nGoal: Prepare repository 'billing-worker' for a production release.\n\nDraft:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nRepository: billing-worker\nGathered facts (from the real Coderift database): {\"repository_name\": \"billing-worker\", \"gather_prs\": {\"pull_requests\": [{\"pull_request_id\": 5, \"repository_name\": \"billing-worker\", \"title\": \"Add caching layer for invoice queries\", \"description\": \"Adds an in-memory cache in front of the invoice lookup query.\", \"author\": \"Ines Duarte\", \"status\": \"Merged\", \"latest_security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-08-15 08:13:36\"}, \"created_at\": \"2026-08-15 08:13:36\"}]}, \"check_incidents\": {\"open_incident\": {\"incident_id\": 1, \"title\": \"Invoice queries returning stale cached totals\", \"severity\": \"critical\", \"created_at\": \"2026-08-15 08:13:36\", \"deployment_id\": 1, \"repository_name\": \"billing-worker\", \"environment_name\": \"production\"}}, \"check_flags\": {\"repository_name\": \"billing-worker\", \"feature_flags\": [{\"name\": \"invoice-cache-layer\", \"environment_name\": \"production\", \"enabled\": true}]}, \"check_deploy_status\": {\"repository_name\": \"billing-worker\", \"environment_name\": \"production\", \"deployment\": {\"deployment_id\": 1, \"status\": \"Failed\", \"deployed_by\": \"Priya Raman\", \"pull_request_title\": \"Add caching layer for invoice queries\", \"created_at\": \"2026-08-15 08:13:36\", \"notes\": \"Cache invalidation bug caused stale invoice totals to be served.\"}}}\n\nDecide which PRs are release-ready (Approved/Merged status AND a Passed latest security scan), whether an open incident should pause the release, and produce the release order plus a BLOCKED list.\n\nFirst understand the problem and devise a plan to solve it. Then carry out the\nplan step by step. Check calculations and common-sense assumptions.\n\nGrounded checks:\n- The deliverable has no visible structure (headings or list items).\n\nCritique:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nGoal: Prepare repository 'billing-worker' for a production release.\nRubric: correctness, completeness, internal consistency, and instruction adherence.\nExternal grounded checks (from the real Coderift database):\n- The deliverable has no visible structure (headings or list items).\n\nDraft:\n[offline fallback: no GOOGLE_API_KEY/GEMINI_API_KEY configured \u2014 echoing the real facts supplied in the prompt below rather than inventing prose]\n\nRepository: billing-worker\nGathered facts (from the real Coderift database): {\"repository_name\": \"billing-worker\", \"gather_prs\": {\"pull_requests\": [{\"pull_request_id\": 5, \"repository_name\": \"billing-worker\", \"title\": \"Add caching layer for invoice queries\", \"description\": \"Adds an in-memory cache in front of the invoice lookup query.\", \"author\": \"Ines Duarte\", \"status\": \"Merged\", \"latest_security_scan\": {\"status\": \"Passed\", \"scan_type\": \"SAST\", \"created_at\": \"2026-08-15 08:13:36\"}, \"created_at\": \"2026-08-15 08:13:36\"}]}, \"check_incidents\": {\"open_incident\": {\"incident_id\": 1, \"title\": \"Invoice queries returning stale cached totals\", \"severity\": \"critical\", \"created_at\": \"2026-08-15 08:13:36\", \"deployment_id\": 1, \"repository_name\": \"billing-worker\", \"environment_name\": \"production\"}}, \"check_flags\": {\"repository_name\": \"billing-worker\", \"feature_flags\": [{\"name\": \"invoice-cache-layer\", \"environment_name\": \"production\", \"enabled\": true}]}, \"check_deploy_status\": {\"repository_name\": \"billing-worker\", \"environment_name\": \"production\", \"deployment\": {\"deployment_id\": 1, \"status\": \"Failed\", \"deployed_by\": \"Priya Raman\", \"pull_request_title\": \"Add caching layer for invoice queries\", \"created_at\": \"2026-08-15 08:13:36\", \"notes\": \"Cache invalidation bug caused stale invoice totals to be served.\"}}}\n\nDecide which PRs are release-ready (Approved/Merged status AND a Passed latest security scan), whether an open incident should pause the release, and produce the release order plus a BLOCKED list.\n\nFirst understand the problem and devise a plan to solve it. Then carry out the\nplan step by step. Check calculations and common-sense assumptions.\n\nList concrete issues. If there are none, respond exactly PASS.\n\nReturn only the improved deliverable.",
+  "llm_stats": {
+    "llm_call_count": 3,
+    "total_tokens": 4293,
+    "input_tokens": 2152,
+    "output_tokens": 2141,
+    "total_latency_seconds": 0.0002,
+    "total_context_chars": 8611,
+    "max_single_prompt_chars": 4468,
+    "context_size_method": "total_context_chars sums every call's raw input character length across the run (not derived from input_tokens); max_single_prompt_chars is the largest single call's input length."
+  },
+  "wall_clock_seconds": 0.0057,
+  "timestamp": 1786783058.7293286
+}

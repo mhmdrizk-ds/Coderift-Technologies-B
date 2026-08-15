@@ -8,6 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..models import EnvironmentFeedback
 from .environment import Environment
+import json
+
+from mcp_server import db
 
 
 class LATSAction(BaseModel):
@@ -184,3 +187,177 @@ def flatten_lats_tree(root: LATSNode) -> list[dict]:
         )
         queue.extend((child, node_id) for child in node.children)
     return records
+
+
+# ---------------------------------------------------------------------------
+# Coderift-specific wiring: propose_remediation — the final "propose the
+# executable action" sub-task for an incident-affected deployment. This is
+# the step where a wrong plan is expensive to unwind (an accepted-but-
+# invalid rollback, or a redeploy on top of an unresolved critical
+# incident), so it goes through LATS's real external-feedback search
+# rather than a single greedy pass or an ungrounded self-critique. See
+# agent.py's routing table and planning_eval/ for the grounded-vs-
+# ungrounded contrast this function is built to support: pass
+# `environment=UngroundedEnvironment()` to reproduce the "expensive
+# theater" baseline the lab brief warns about, or leave `environment=None`
+# for the real, shipped, DB-backed default.
+# ---------------------------------------------------------------------------
+
+REMEDIATION_TASK_TEMPLATE = """A production incident is open. Propose ONE concrete
+remediation action for it, as a single compact JSON object and NOTHING else — no
+prose, no markdown fences. The JSON must match exactly one of these shapes:
+  {{"action": "rollback_deployment", "deployment_id": <int>}}
+  {{"action": "deploy_pr", "repository_name": "<str>", "environment_name": "<str>", "pull_request_id": <int>}}
+
+Real facts (from the Coderift database): {facts}
+
+Your proposed action's `state` must BE the JSON action object itself (as a string),
+so it can be checked against the real database."""
+
+
+def _gather_remediation_facts(repository_name: str, deployment_id: int) -> dict:
+    conn = db.get_connection()
+    try:
+        deployment = conn.execute(
+            """
+            SELECT d.id, d.status, d.notes, d.repository_id, d.environment_id,
+                   r.name AS repository_name, e.name AS environment_name,
+                   d.pull_request_id
+            FROM deployments d
+            JOIN repositories r ON r.id = d.repository_id
+            JOIN environments e ON e.id = d.environment_id
+            WHERE d.id = ?
+            """,
+            (deployment_id,),
+        ).fetchone()
+        if deployment is None:
+            raise ValueError(f"No deployment #{deployment_id}.")
+        incident = conn.execute(
+            """
+            SELECT id, title, severity, status
+            FROM incidents WHERE deployment_id = ? AND status = 'open'
+            """,
+            (deployment_id,),
+        ).fetchone()
+        other_prs = conn.execute(
+            """
+            SELECT pr.id, pr.status, s.status AS scan_status
+            FROM pull_requests pr
+            LEFT JOIN security_scans s ON s.id = (
+                SELECT id FROM security_scans WHERE pull_request_id = pr.id
+                ORDER BY created_at DESC LIMIT 1
+            )
+            WHERE pr.repository_id = ?
+            """,
+            (deployment["repository_id"],),
+        ).fetchall()
+        return {
+            "deployment": dict(deployment),
+            "open_incident": dict(incident) if incident else None,
+            "repository_pull_requests": [dict(pr) for pr in other_prs],
+        }
+    finally:
+        conn.close()
+
+
+def _deterministic_remediation_actions(facts: dict, round_number: int) -> list[dict]:
+    """Real, content-grounded candidate actions used when no live model is
+    configured. Deliberately includes a plausible-looking-but-invalid
+    action alongside a genuinely valid one where the seed data supports it,
+    so the offline path still exercises real branch pruning."""
+    deployment = facts["deployment"]
+    dep_id = deployment["id"]
+    candidates = []
+    # Candidate A: the "obvious" move — roll back the affected deployment.
+    # Valid ONLY if its status is Succeeded/InProgress.
+    candidates.append({
+        "action": "rollback_deployment",
+        "state": json.dumps({"action": "rollback_deployment", "deployment_id": dep_id}),
+    })
+    # Candidate B: try redeploying a currently-Merged PR for the same repo
+    # (a "hotfix" move) — valid only if no open high/critical incident
+    # blocks it and the PR/scan are clean.
+    merged_prs = [pr for pr in facts["repository_pull_requests"] if pr["status"] == "Merged"]
+    if merged_prs:
+        pr = merged_prs[0]
+        candidates.append({
+            "action": "deploy_pr",
+            "state": json.dumps({
+                "action": "deploy_pr",
+                "repository_name": deployment["repository_name"],
+                "environment_name": deployment["environment_name"],
+                "pull_request_id": pr["id"],
+            }),
+        })
+    else:
+        # No merged PR to redeploy — propose the rollback again with a
+        # different reason field so the tree still has 2 real branches to
+        # score and reflect on, rather than degenerating to 1.
+        candidates.append({
+            "action": "rollback_deployment_retry",
+            "state": json.dumps({"action": "rollback_deployment", "deployment_id": dep_id}),
+        })
+    return candidates[:2]
+
+
+def propose_remediation_with_lats(
+    repository_name: str,
+    deployment_id: int,
+    llm: BaseChatModel,
+    environment: "Environment | None" = None,
+    iterations: int = 2,
+    n_actions: int = 2,
+    exploration_weight: float = 1.414,
+) -> LATSResult:
+    """MCTS-guided search (select -> expand/simulate -> evaluate/reflect ->
+    backpropagate) over concrete remediation actions for an
+    incident-affected deployment, scored by real external feedback (the
+    `environment` argument — grounded `Environment` by default; pass an
+    `UngroundedEnvironment` for the required contrast). Falls back to a
+    deterministic-but-real (same tree mechanics, content-grounded
+    candidates) offline path when no live model is configured, matching
+    every other algorithm module's offline-fallback contract in this repo.
+    """
+    environment = environment or Environment()
+    facts = _gather_remediation_facts(repository_name, deployment_id)
+    task = REMEDIATION_TASK_TEMPLATE.format(facts=json.dumps(facts))
+
+    try:
+        return lats(
+            task, llm, environment,
+            iterations=iterations, n_actions=n_actions, exploration_weight=exploration_weight,
+        )
+    except Exception:
+        return _offline_lats_remediation(task, facts, environment, iterations, n_actions, exploration_weight)
+
+
+def _offline_lats_remediation(
+    task: str, facts: dict, environment: "Environment",
+    iterations: int, n_actions: int, exploration_weight: float,
+) -> LATSResult:
+    root = LATSNode(state="No attempt yet.")
+    best = root
+    completed_iterations = 0
+    for iteration in range(1, iterations + 1):
+        completed_iterations = iteration
+        leaf = _select_leaf(root, exploration_weight)
+        for item in _deterministic_remediation_actions(facts, iteration)[:n_actions]:
+            child = LATSNode(state=item["state"], action=item["action"], parent=leaf)
+            leaf.children.append(child)
+            feedback = environment.evaluate(child.state)
+            child.feedback = feedback
+            child.environment_score = feedback.score
+            child.model_score = feedback.score  # no live value function offline; env score stands in
+            combined_value = 0.75 * child.environment_score + 0.25 * child.model_score
+            if not feedback.success:
+                reflection = (
+                    f"[offline reflection] Action '{child.action}' scored {feedback.score} "
+                    f"because: {'; '.join(feedback.details) or 'no external feedback issues recorded'}."
+                )
+                child.reflections.append(reflection)
+            _backpropagate(child, combined_value)
+            if best is root or child.environment_score > best.environment_score:
+                best = child
+            if feedback.success:
+                return LATSResult(True, child.state, child.environment_score, completed_iterations, root)
+    return LATSResult(False, best.state, best.environment_score, completed_iterations, root)

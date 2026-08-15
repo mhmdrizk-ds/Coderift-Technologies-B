@@ -1,0 +1,39 @@
+{
+  "case": {
+    "id": "no_valid_target_honest_negative",
+    "task_description": "Roll back the billing-worker deployment tied to the open incident.",
+    "deployment_ids": [
+      1
+    ],
+    "max_trials": 3,
+    "expects_success": false,
+    "why": "Only one candidate exists and it is genuinely never rollback-eligible while the incident stays open. Tests that Reflexion returns the best-scoring (not a fabricated-successful) attempt after exhausting max_trials \u2014 an honest negative result, matching this repo's existing mini_suite convention of reporting real findings rather than smoothing them over."
+  },
+  "trace": {
+    "output": "{\"action\": \"rollback_deployment\", \"deployment_id\": 1}",
+    "trial_count": 3,
+    "trials": [
+      {
+        "number": 1,
+        "attempt": "{\"action\": \"rollback_deployment\", \"deployment_id\": 1}",
+        "success": false,
+        "score": 0.0,
+        "reflection": "I picked deployment #1 (status 'Failed') without checking whether its status allows a rollback. External feedback: Deployment #1 is 'Failed'; only a Succeeded or InProgress deployment can be rolled back.. Next trial, I should only propose a deployment whose status is Succeeded or InProgress."
+      },
+      {
+        "number": 2,
+        "attempt": "{\"action\": \"rollback_deployment\", \"deployment_id\": 1}",
+        "success": false,
+        "score": 0.0,
+        "reflection": "I picked deployment #1 (status 'Failed') without checking whether its status allows a rollback. External feedback: Deployment #1 is 'Failed'; only a Succeeded or InProgress deployment can be rolled back.. Next trial, I should only propose a deployment whose status is Succeeded or InProgress."
+      },
+      {
+        "number": 3,
+        "attempt": "{\"action\": \"rollback_deployment\", \"deployment_id\": 1}",
+        "success": false,
+        "score": 0.0,
+        "reflection": "I picked deployment #1 (status 'Failed') without checking whether its status allows a rollback. External feedback: Deployment #1 is 'Failed'; only a Succeeded or InProgress deployment can be rolled back.. Next trial, I should only propose a deployment whose status is Succeeded or InProgress."
+      }
+    ]
+  }
+}

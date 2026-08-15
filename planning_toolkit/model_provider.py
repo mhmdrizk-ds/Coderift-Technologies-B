@@ -32,6 +32,16 @@ class NoLiveModelConfigured(RuntimeError):
     the rest of this repo."""
 
 
+def is_live_model_configured() -> bool:
+    """True iff GOOGLE_API_KEY/GEMINI_API_KEY is set, i.e. every offline
+    fallback in this module (and in the Coderift-specific wiring in
+    tree_of_thoughts.py/lats.py/reflexion.py, which check this explicitly
+    rather than relying on exception-catching for algorithms like
+    reflexion() whose plain .invoke() never raises) will be used instead
+    of a real Gemini call."""
+    return bool(os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY"))
+
+
 def _call_google(prompt: str, system_prompt: str | None, max_tokens: int) -> str | None:
     api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
     if not api_key:

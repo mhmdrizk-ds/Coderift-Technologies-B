@@ -237,6 +237,48 @@ cd retrieval_eval && python3 run_eval.py
 python3 -m agent.client --all
 ```
 
+## Decomposition & Planning (Week 4 extension)
+
+**The problem.** Two real requests neither the memory/RAG agent nor a
+single MCP tool call can safely resolve on their own:
+
+1. *"Prepare repository X for a production release."* Which candidate PRs
+   are actually ready depends on scan status, an open-incident check, and
+   sometimes a genuinely ambiguous case (a human-Approved PR whose
+   security scan is still `Pending`, not `Failed` and not `Passed` — no
+   single correct answer, only defensible strategies).
+2. *"An incident is open on deployment X — what do we actually do?"*
+   Proposing a concrete remediation action (rollback vs. redeploy) is
+   real database state, not prose — a wrong guess is expensive to unwind,
+   and there's real external ground truth (the deployment's actual
+   status, whether an incident is genuinely open) to check the proposal
+   against before it ships.
+
+**The agent.** `planning_toolkit/` — the Release Readiness & Incident
+Remediation Planning Agent, `planning_lab/agent.py` as its single routing
+entry point — sits next to `memory/`/`rag/`, reuses the same
+`mcp_server/`/`db/` everything else here uses, and never touches the
+memory/RAG agent's code path. It implements, against real data, both
+required decomposition methods (decomposition-first, dynamic/interleaved
+— acyclicity enforced, a real divergence case), all three planning
+algorithms routed by sub-task shape (Plan-and-Solve, Tree of Thoughts,
+LATS), both self-correction scopes (Self-Refine, Reflexion), and a real
+grounded `Environment` (plus a deliberately fake one kept only for the
+required grounded-vs-ungrounded contrast).
+
+See `planning_toolkit/README.md` for the full writeup, `planning_eval/`
+for the complete cost & quality comparison table across every method
+against a fixed real-request test suite, and
+`planning_eval/DEMO_TRANSCRIPT.md` for a walkthrough of every required
+demo element with real captured output.
+
+```bash
+python3 db/init_db.py
+python3 -m planning_toolkit.compare_divergence
+python3 -m planning_eval.run_eval
+python3 -m pytest planning_toolkit/tests/ -v
+```
+
 ## Repository layout
 
 ```
@@ -244,11 +286,13 @@ db/               schema.sql, seed.sql, ERD.mmd, init_db.py, README.md
 mcp_server/       server code — see mcp_server/README.md for the concern-by-concern index
 resources/        Policy documents (RAG corpus) — production deployment, security review, incident response
 prompts/          draft_rollback_plan / draft_incident_postmortem (prompt templates)
-agent/            demo client — see agent/README.md
+agent/            demo client (agent/README.md) + planning_client.py (planning agent CLI)
 memory/           short-term buffer, router, episodic/semantic stores, consolidation, scheduler — memory/api.py is the only import surface
 rag/              naive/hybrid/agentic/graph RAG, Self-RAG, vector store — see rag/README.md
 context_eval/     context-window pruning strategy benchmark — see context_eval/README.md
 retrieval_eval/   RAG architecture comparison — see retrieval_eval/README.md
 demo/             DEMO_TRANSCRIPT.md (MCP lab, all 9 concerns) + cross_session_memory_demo.py (Session 3 flagship demo)
+planning_toolkit/ Release Readiness & Incident Remediation Planning Agent — decomposition, PS/ToT/LATS, Self-Refine/Reflexion — see planning_toolkit/README.md
+planning_eval/    Full cost/quality comparison table + fixed test suite + demo transcript for the planning agent
 ```
 
