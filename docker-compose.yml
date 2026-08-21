@@ -1,0 +1,48 @@
+# Coderift Technologies — Docker Compose
+# Person A wrote this, coordinated with Person C on final integration.
+#
+# Services:
+#   - mcp_server: MCP HTTP transport on port 8000
+#   - admin_platform: Admin UI + API on port 8001
+#   - Both share the same SQLite database volume
+#
+# Usage:
+#   docker-compose up --build
+#   Then open http://localhost:8001 for the admin platform
+#   and http://localhost:8000/health for the MCP server health check.
+
+version: "3.9"
+
+services:
+  mcp_server:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - db_data:/app/db
+    environment:
+      - PYTHONPATH=/app
+    command: python -m mcp_server.server_http --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  admin_platform:
+    build: .
+    ports:
+      - "8001:8001"
+    volumes:
+      - db_data:/app/db
+      - rag_data:/app/resources
+    environment:
+      - PYTHONPATH=/app
+    command: python -m platform.admin_tools_api
+    depends_on:
+      mcp_server:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  rag_data:

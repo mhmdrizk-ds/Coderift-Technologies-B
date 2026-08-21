@@ -46,3 +46,7 @@ python-dotenv>=1.0,<2
 # Unit tests (should be updated to cover the new grounded Environment
 # instead of the old assumption that Environment is randomized)
 pytest>=8,<9
+
+fastapi
+uvicorn
+pydantic

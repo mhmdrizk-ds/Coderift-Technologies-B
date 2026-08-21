@@ -3,11 +3,48 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from state_graph.contracts import NodeFailure
-
+from mcp_server import db as mcp_db
+from mcp_server.auth import Session
+from mcp_server.context import ToolContext
+from mcp_server.tools_impl.deploy_tools import handle_deploy_to_production
+from mcp_server.tools_impl.release_tools import handle_rollback_deployment
+from mcp_server.tools_impl.query_tools import handle_check_deployment_status
+from mcp_server.tools_impl.incident_tools import handle_draft_incident_summary
 
 class McpAdapter:
     def __init__(self, client: Any = None):
-        self._client = client or SimulatedMcpClient()
+        self._client = client
+        self._conn = None
+        self._session = None
+        self._ctx = None
+    
+    def _ensure_real_session(self):
+        """Lazy-init DB connection + authenticated lead session for real MCP calls."""
+        if self._conn is None:
+            self._conn = mcp_db.get_connection()
+            self._session = Session()
+            engineer = mcp_db.get_engineer_by_access_code(self._conn, "ENG-LEAD-01")
+            if engineer is None:
+                raise RuntimeError(
+                    "Lead engineer ENG-LEAD-01 not found in DB. "
+                    "Run db/init_db.py to seed the database."
+                )
+            self._session.login(engineer)
+            self._ctx = ToolContext(self._session)
+
+    @staticmethod
+    def _extract_text(result: dict) -> str:
+        """Extract readable text from an MCP tool result dict."""
+        if not isinstance(result, dict):
+            return str(result)
+        content = result.get("content")
+        if isinstance(content, list) and len(content) > 0:
+            first = content[0]
+            if isinstance(first, dict):
+                return first.get("text", str(result))
+        if "text" in result:
+            return result["text"]
+        return str(result)
 
     def seed_pull_request(self, pull_request_id: int, status: str = "Open",
                             scan_status: Optional[str] = None) -> None:
@@ -17,11 +54,29 @@ class McpAdapter:
             self._client.seed_pull_request(pull_request_id, status, scan_status)
 
     def draft_incident_summary(self, incident_id: int) -> str:
+        if self._client is not None:
+            # Simulated mode (for tests)
+            try:
+                return self._client.call(
+                    "draft_incident_summary", {"incident_id": incident_id}
+                )
+            except Exception as exc:
+                raise NodeFailure(
+                    "DRAFT_SUMMARY_TOOL_ERROR",
+                    f"draft_incident_summary failed for incident {incident_id}: {exc}",
+                    payload={"incident_id": incident_id},
+                ) from exc
+        # Real MCP call
+        self._ensure_real_session()
         try:
-            return self._client.call(
-                "draft_incident_summary", {"incident_id": incident_id}
+            result = handle_draft_incident_summary(
+                self._conn, self._session, self._ctx,
+                {"incident_id": incident_id}
             )
-        except Exception as exc: 
+            return self._extract_text(result)
+        except NodeFailure:
+            raise
+        except Exception as exc:
             raise NodeFailure(
                 "DRAFT_SUMMARY_TOOL_ERROR",
                 f"draft_incident_summary failed for incident {incident_id}: {exc}",
@@ -30,16 +85,48 @@ class McpAdapter:
 
     def deploy_fix(self, repo: str, environment: str, pr_id: int,
                      deployed_by: str) -> dict:
+        if self._client is not None:
+            # Simulated mode (for tests)
+            try:
+                return self._client.call(
+                    "deploy_to_production",
+                    {
+                        "repo": repo,
+                        "environment": environment,
+                        "pr_id": pr_id,
+                        "deployed_by": deployed_by,
+                    },
+                )
+            except Exception as exc:
+                raise NodeFailure(
+                    "DEPLOY_FIX_TOOL_ERROR",
+                    f"deploy_to_production failed for repo={repo} pr={pr_id}: {exc}",
+                    payload={"repo": repo, "environment": environment, "pr_id": pr_id},
+                ) from exc
+        # Real MCP call — FIXED parameter names to match MCP server schema
+        self._ensure_real_session()
         try:
-            return self._client.call(
-                "deploy_to_production",
+            result = handle_deploy_to_production(
+                self._conn, self._session, self._ctx,
                 {
-                    "repo": repo,
-                    "environment": environment,
-                    "pr_id": pr_id,
-                    "deployed_by": deployed_by,
-                },
+                    "repository_name": repo,
+                    "environment_name": environment,
+                    "pull_request_id": pr_id,
+                }
             )
+            text = self._extract_text(result)
+            deployment_id = None
+            if isinstance(result, dict) and "deployment_id" in result:
+                deployment_id = result["deployment_id"]
+            return {
+                "deployment_id": deployment_id,
+                "status": "Succeeded" if "deployed" in text.lower() else "Failed",
+                "repo": repo,
+                "environment": environment,
+                "details": text,
+            }
+        except NodeFailure:
+            raise
         except Exception as exc:
             raise NodeFailure(
                 "DEPLOY_FIX_TOOL_ERROR",
@@ -48,16 +135,101 @@ class McpAdapter:
             ) from exc
 
     def check_deployment_status(self, deployment_id: int) -> dict:
+        if self._client is not None:
+            # Simulated mode (for tests)
+            try:
+                return self._client.call(
+                    "check_deployment_status", {"deployment_id": deployment_id}
+                )
+            except Exception as exc:
+                raise NodeFailure(
+                    "STATUS_CHECK_TOOL_ERROR",
+                    f"check_deployment_status failed for deployment {deployment_id}: {exc}",
+                    payload={"deployment_id": deployment_id},
+                ) from exc
+        # Real MCP call
+        self._ensure_real_session()
         try:
-            return self._client.call(
-                "check_deployment_status", {"deployment_id": deployment_id}
+            dep = self._conn.execute(
+                """
+                SELECT r.name AS repo_name, e.name AS env_name
+                FROM deployments d
+                JOIN repositories r ON r.id = d.repository_id
+                JOIN environments e ON e.id = d.environment_id
+                WHERE d.id = ?
+                """,
+                (deployment_id,),
+            ).fetchone()
+            if dep is None:
+                return {"deployment_id": deployment_id, "status": "Unknown"}
+
+            result = handle_check_deployment_status(
+                self._conn, self._session, self._ctx,
+                {
+                    "repository_name": dep["repo_name"],
+                    "environment_name": dep["env_name"],
+                }
             )
+            text = self._extract_text(result)
+            status = "Succeeded"
+            if "Failed" in text:
+                status = "Failed"
+            elif "RolledBack" in text or "rollback" in text.lower():
+                status = "RolledBack"
+            elif "Pending" in text:
+                status = "Pending"
+            elif "InProgress" in text:
+                status = "InProgress"
+            return {
+                "deployment_id": deployment_id,
+                "status": status,
+                "details": text,
+            }
+        except NodeFailure:
+            raise
         except Exception as exc:
             raise NodeFailure(
                 "STATUS_CHECK_TOOL_ERROR",
                 f"check_deployment_status failed for deployment {deployment_id}: {exc}",
                 payload={"deployment_id": deployment_id},
             ) from exc
+
+    def rollback_deployment(self, deployment_id: int, reason: str) -> dict:
+        """Roll back a deployment — used by incident_response graph."""
+        if self._client is not None:
+            # Simulated mode
+            try:
+                return self._client.call(
+                    "rollback_deployment",
+                    {"deployment_id": deployment_id, "reason": reason}
+                )
+            except Exception as exc:
+                raise NodeFailure(
+                    "ROLLBACK_TOOL_ERROR",
+                    f"rollback_deployment failed for deployment {deployment_id}: {exc}",
+                    payload={"deployment_id": deployment_id},
+                ) from exc
+        # Real MCP call
+        self._ensure_real_session()
+        try:
+            result = handle_rollback_deployment(
+                self._conn, self._session, self._ctx,
+                {"deployment_id": deployment_id, "reason": reason}
+            )
+            text = self._extract_text(result)
+            return {
+                "deployment_id": deployment_id,
+                "status": "RolledBack" if "rollback" in text.lower() else "Failed",
+                "details": text,
+            }
+        except NodeFailure:
+            raise
+        except Exception as exc:
+            raise NodeFailure(
+                "ROLLBACK_TOOL_ERROR",
+                f"rollback_deployment failed for deployment {deployment_id}: {exc}",
+                payload={"deployment_id": deployment_id},
+            ) from exc        
 
     # -- security_remediation graph tools -------------------------------
     # These wrap the *real* mcp_server tools (get_pull_request,

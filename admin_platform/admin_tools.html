@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coderift Technologies — Admin Platform</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --bg-card: #161b22;
+            --bg-hover: #1c2128;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --text-muted: #8b949e;
+            --text-bright: #f0f6fc;
+            --accent: #58a6ff;
+            --accent-hover: #79b8ff;
+            --success: #238636;
+            --success-bg: rgba(35, 134, 54, 0.15);
+            --danger: #da3633;
+            --danger-bg: rgba(218, 54, 51, 0.15);
+            --warning: #d29922;
+            --warning-bg: rgba(210, 153, 34, 0.15);
+            --info: #1f6feb;
+            --info-bg: rgba(31, 111, 235, 0.15);
+            --radius: 12px;
+            --shadow: 0 8px 24px rgba(0,0,0,0.35);
+            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 24px;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 32px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+            gap: 20px;
+            max-width: 1600px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            transition: border-color 0.2s;
+        }
+
+        .card:hover { border-color: #484f58; }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-bright);
+        }
+
+        .card-header .icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .icon-tools { background: var(--info-bg); }
+        .icon-hitl { background: var(--warning-bg); }
+        .icon-tickets { background: var(--danger-bg); }
+        .icon-checkpoints { background: rgba(88, 166, 255, 0.15); }
+        .icon-events { background: var(--success-bg); }
+        .icon-rag { background: rgba(139, 148, 158, 0.15); }
+
+        .card-desc {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th {
+            text-align: left;
+            padding: 10px 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        tr:hover td { background: var(--bg-hover); }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .badge-pending { background: var(--warning-bg); color: var(--warning); }
+        .badge-approved { background: var(--success-bg); color: #3fb950; }
+        .badge-rejected { background: var(--danger-bg); color: var(--danger); }
+        .badge-open { background: var(--danger-bg); color: var(--danger); }
+        .badge-resolved { background: var(--success-bg); color: #3fb950; }
+        .badge-running { background: var(--info-bg); color: var(--info); }
+        .badge-paused { background: var(--warning-bg); color: var(--warning); }
+        .badge-completed { background: var(--success-bg); color: #3fb950; }
+        .badge-ticketed { background: var(--danger-bg); color: var(--danger); }
+
+        button {
+            border: none;
+            border-radius: 6px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+        .btn-primary:hover { background: var(--accent-hover); }
+
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+        }
+        .btn-success:hover { background: #2ea043; }
+
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+        }
+        .btn-danger:hover { background: #f85149; }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 11px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        input[type="text"], textarea {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 13px;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        textarea { resize: vertical; min-height: 80px; }
+
+        .form-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            align-items: flex-end;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .empty-state-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+            opacity: 0.5;
+        }
+
+        .doc-list {
+            list-style: none;
+        }
+
+        .doc-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+
+        .doc-list li:hover { border-color: #484f58; }
+
+        .refresh-indicator {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .truncate {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+            body { padding: 12px; }
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+
+<h1>🔧 Coderift Technologies</h1>
+<p class="subtitle">Admin Platform — Agent Management, HITL Tasks, Tickets & RAG Documents</p>
+
+<div class="refresh-indicator">
+    <span class="dot"></span>
+    <span id="lastRefresh">Live — refreshing every 5s</span>
+</div>
+
+<div class="grid">
+
+<!-- ==================== 1. AGENT TOOLS ==================== -->
+<div class="card">
+    <div class="card-header">
+        <div class="icon icon-tools">🛠️</div>
+        <h2>MCP Tool Management</h2>
+    </div>
+    <p class="card-desc">Add or remove tools available to each agent at runtime. Changes reach the live MCP server immediately.</p>
+
+    <table id="agentToolsTable">
+        <thead>
+            <tr>
+                <th>Agent ID</th>
+                <th>Tool</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="4" class="empty-state"><div class="empty-state-icon">🛠️</div>No tools registered yet</td></tr>
+        </tbody>
+    </table>
+
+    <h3 style="margin-top: 20px; font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">Add Tool to Agent</h3>
+    <form id="addToolForm">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Agent ID</label>
+                <input type="text" id="agentId" placeholder="e.g. incident_response_agent" required>
+            </div>
+            <div class="form-group">
+                <label>Tool Name</label>
+                <input type="text" id="toolName" placeholder="e.g. rollback_deployment" required>
+            </div>
+            <button type="submit" class="btn-primary">Add Tool</button>
+        </div>
+    </form>
+</div>
+
+<!-- ==================== 2. HITL TASKS ==================== -->
+<div class="card">
+    <div class="card-header">
+        <div class="icon icon-hitl">⏸️</div>
+        <h2>Pending HITL Tasks</h2>
+    </div>
+    <p class="card-desc">Approve or reject human-in-the-loop pauses. The graph resumes only after your action.</p>
+
+    <table id="hitlTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Graph</th>
+                <th>Node</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="7" class="empty-state"><div class="empty-state-icon">⏸️</div>No pending HITL tasks</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- ==================== 3. TICKETS ==================== -->
+<div class="card">
+    <div class="card-header">
+        <div class="icon icon-tickets">🎫</div>
+        <h2>Open Tickets</h2>
+    </div>
+    <p class="card-desc">Mid-node failures that opened tickets. Resolve to resume the graph from its last checkpoint.</p>
+
+    <table id="ticketsTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Graph</th>
+                <th>Node</th>
+                <th>Error</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="7" class="empty-state"><div class="empty-state-icon">🎫</div>No tickets found</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- ==================== 4. CHECKPOINTS ==================== -->
+<div class="card">
+    <div class="card-header">
+        <div class="icon icon-checkpoints">💾</div>
+        <h2>Active Checkpoints</h2>
+    </div>
+    <p class="card-desc">All persisted graph states. Used for crash-and-resume demonstration.</p>
+
+    <table id="checkpointsTable">
+        <thead>
+            <tr>
+                <th>Run ID</th>
+                <th>Graph</th>
+                <th>Current State</th>
+                <th>Status</th>
+                <th>Last Updated</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="5" class="empty-state"><div class="empty-state-icon">💾</div>No checkpoints yet</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- ==================== 5. EXTERNAL EVENTS ==================== -->
+<div class="card">
+    <div class="card-header">
+        <div class="icon icon-events">📡</div>
+        <h2>Send External Event</h2>
+    </div>
+    <p class="card-desc">For runs stuck in awaiting_verification: send a monitoring signal so the graph continues.</p>
+
+    <form id="eventForm">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Run ID</label>
+                <input type="text" id="eventRunId" placeholder="uuid" required>
+            </div>
+            <div class="form-group">
+                <label>Event Key</label>
+                <input type="text" id="eventKey" value="verification_result" required>
+            </div>
+            <div class="form-group">
+                <label>Event Value</label>
+                <input type="text" id="eventValue" value="healthy" required>
+            </div>
+        </div>
+        <button type="submit" class="btn-success">Send Event & Resume</button>
+    </form>
+</div>
+
+<!-- ==================== 6. RAG DOCS ==================== -->
+<div class="card">
+    <div class="card-header">
+        <div class="icon icon-rag">📚</div>
+        <h2>RAG Document Management</h2>
+    </div>
+    <p class="card-desc">Add or remove documents from the RAG store. The memory/RAG agent reflects changes on the next query.</p>
+
+    <h3 style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">Current Documents</h3>
+    <ul id="ragDocsList" class="doc-list">
+        <li class="empty-state" style="background:none;border:none;padding:20px;"><div class="empty-state-icon">📚</div>No documents uploaded</li>
+    </ul>
+
+    <h3 style="margin-top: 20px; font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">Upload New Document</h3>
+    <form id="ragUploadForm">
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Document Name</label>
+            <input type="text" id="docName" placeholder="e.g. incident_response_runbook_v2.md" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Content</label>
+            <textarea id="docContent" placeholder="Paste markdown content here..." required></textarea>
+        </div>
+        <button type="submit" class="btn-primary">Upload to RAG</button>
+    </form>
+</div>
+
+</div>
+
+<script>
+const API_BASE = "http://localhost:8001";
+
+function getBadge(status) {
+    const map = {
+        pending: 'badge-pending', approved: 'badge-approved', rejected: 'badge-rejected',
+        open: 'badge-open', resolved: 'badge-resolved', investigating: 'badge-pending',
+        running: 'badge-running', paused_hitl: 'badge-paused', waiting: 'badge-pending',
+        completed: 'badge-completed', ticketed: 'badge-ticketed'
+    };
+    return `<span class="badge ${map[status] || 'badge-pending'}">${status}</span>`;
+}
+
+async function loadAll() {
+    await loadAgentTools();
+    await loadHITLTasks();
+    await loadTickets();
+    await loadCheckpoints();
+    await loadRAGDocs();
+    document.getElementById("lastRefresh").textContent = "Live — last refresh: " + new Date().toLocaleTimeString();
+}
+
+// 1. Agent Tools
+async function loadAgentTools() {
+    try {
+        const resp = await fetch(`${API_BASE}/api/agent-tools`);
+        const data = await resp.json();
+        const tbody = document.querySelector("#agentToolsTable tbody");
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="empty-state-icon">🛠️</div>No tools registered yet</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(row => `
+            <tr>
+                <td>${row.agent_id}</td>
+                <td><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:12px;">${row.tool_name}</code></td>
+                <td>${getBadge(row.enabled ? 'approved' : 'rejected')}</td>
+                <td>
+                    <div class="btn-group">
+                        <button class="btn-sm ${row.enabled ? 'btn-danger' : 'btn-success'}" onclick="toggleTool(${row.id}, ${!row.enabled})">${row.enabled ? 'Disable' : 'Enable'}</button>
+                        <button class="btn-sm btn-danger" onclick="removeTool(${row.id})">Remove</button>
+                    </div>
+                </td>
+            </tr>
+        `).join("");
+    } catch (e) {
+        console.error("Failed to load agent tools:", e);
+    }
+}
+
+async function toggleTool(id, newState) {
+    await fetch(`${API_BASE}/api/agent-tools/${id}/toggle`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({enabled: newState}) });
+    loadAgentTools();
+}
+
+async function removeTool(id) {
+    if (!confirm("Remove this tool from agent?")) return;
+    await fetch(`${API_BASE}/api/agent-tools/${id}`, { method: "DELETE" });
+    loadAgentTools();
+}
+
+document.getElementById("addToolForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const agent = document.getElementById("agentId").value;
+    const tool = document.getElementById("toolName").value;
+    await fetch(`${API_BASE}/api/agent-tools`, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({agent_id: agent, tool_name: tool, enabled: true})
+    });
+    document.getElementById("addToolForm").reset();
+    loadAgentTools();
+});
+
+// 2. HITL Tasks
+async function loadHITLTasks() {
+    try {
+        const resp = await fetch(`${API_BASE}/api/hitl-tasks`);
+        const data = await resp.json();
+        const tbody = document.querySelector("#hitlTable tbody");
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="empty-state-icon">⏸️</div>No pending HITL tasks</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(t => {
+            const payload = t.payload ? JSON.stringify(t.payload).substring(0, 60) + "..." : "—";
+            return `
+            <tr>
+                <td><code style="font-size:11px;">#${t.id}</code></td>
+                <td>${t.graph_name}</td>
+                <td><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px;">${t.node_name}</code></td>
+                <td class="truncate" title="${t.reason || ''}">${t.reason ? t.reason.substring(0, 40) + "..." : "—"}</td>
+                <td>${getBadge(t.status)}</td>
+                <td style="font-size:11px;color:var(--text-muted);">${t.created_at}</td>
+                <td>
+                    ${t.status === "pending" ? `
+                        <div class="btn-group">
+                            <button class="btn-success btn-sm" onclick="resolveHITL(${t.id}, true)">✓ Approve</button>
+                            <button class="btn-danger btn-sm" onclick="resolveHITL(${t.id}, false)">✕ Reject</button>
+                        </div>
+                    ` : `<span style="font-size:11px;color:var(--text-muted);">${t.decided_by ? 'by ' + t.decided_by : ''}</span>`}
+                </td>
+            </tr>
+            `;
+        }).join("");
+    } catch (e) {
+        console.error("Failed to load HITL tasks:", e);
+    }
+}
+
+async function resolveHITL(taskId, approved) {
+    const note = prompt("Resolution note (optional):", "") || "";
+    await fetch(`${API_BASE}/api/hitl-tasks/${taskId}/resolve`, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({approved: approved, decided_by: "admin", note: note})
+    });
+    loadHITLTasks();
+    loadCheckpoints();
+}
+
+// 3. Tickets
+async function loadTickets() {
+    try {
+        const resp = await fetch(`${API_BASE}/api/tickets`);
+        const data = await resp.json();
+        const tbody = document.querySelector("#ticketsTable tbody");
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="empty-state-icon">🎫</div>No tickets found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(t => `
+            <tr>
+                <td><code style="font-size:11px;">#${t.id}</code></td>
+                <td>${t.graph_name}</td>
+                <td><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px;">${t.node_name}</code></td>
+                <td class="truncate" title="${t.error_code || ''}">${t.error_code}</td>
+                <td>${getBadge(t.status)}</td>
+                <td style="font-size:11px;color:var(--text-muted);">${t.created_at}</td>
+                <td>
+                    ${t.status !== "resolved" ? `
+                        <button class="btn-success btn-sm" onclick="resolveTicket(${t.id})">Resolve & Resume</button>
+                    ` : `<span style="font-size:11px;color:var(--text-muted);">Resolved</span>`}
+                </td>
+            </tr>
+        `).join("");
+    } catch (e) {
+        console.error("Failed to load tickets:", e);
+    }
+}
+
+async function resolveTicket(ticketId) {
+    const note = prompt("Resolution note:", "Root cause fixed, retrying deploy") || "";
+    await fetch(`${API_BASE}/api/tickets/${ticketId}/resolve`, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({note: note})
+    });
+    loadTickets();
+    loadCheckpoints();
+}
+
+// 4. Checkpoints
+async function loadCheckpoints() {
+    try {
+        const resp = await fetch(`${API_BASE}/api/checkpoints`);
+        const data = await resp.json();
+        const tbody = document.querySelector("#checkpointsTable tbody");
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="empty-state-icon">💾</div>No checkpoints yet</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(c => `
+            <tr>
+                <td><code style="font-size:11px;">${c.run_id.substring(0, 16)}...</code></td>
+                <td>${c.graph_name}</td>
+                <td><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:11px;">${c.node_name}</code></td>
+                <td>${getBadge(c.status)}</td>
+                <td style="font-size:11px;color:var(--text-muted);">${c.created_at}</td>
+            </tr>
+        `).join("");
+    } catch (e) {
+        console.error("Failed to load checkpoints:", e);
+    }
+}
+
+// 5. External Events
+document.getElementById("eventForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const runId = document.getElementById("eventRunId").value;
+    const key = document.getElementById("eventKey").value;
+    const value = document.getElementById("eventValue").value;
+    try {
+        await fetch(`${API_BASE}/api/runs/${runId}/event`, {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({[key]: value})
+        });
+        alert("✅ Event sent. Graph should resume.");
+        loadCheckpoints();
+    } catch (e) {
+        alert("❌ Failed to send event: " + e.message);
+    }
+});
+
+// 6. RAG Documents
+async function loadRAGDocs() {
+    try {
+        const resp = await fetch(`${API_BASE}/api/rag-docs`);
+        const data = await resp.json();
+        const ul = document.getElementById("ragDocsList");
+        if (data.length === 0) {
+            ul.innerHTML = '<li class="empty-state" style="background:none;border:none;padding:20px;"><div class="empty-state-icon">📚</div>No documents uploaded</li>';
+            return;
+        }
+        ul.innerHTML = data.map(doc => `
+            <li>
+                <span>📄 ${doc.name}</span>
+                <button class="btn-sm btn-danger" onclick="removeRAGDoc('${doc.name}')">Remove</button>
+            </li>
+        `).join("");
+    } catch (e) {
+        console.error("Failed to load RAG docs:", e);
+    }
+}
+
+async function removeRAGDoc(name) {
+    if (!confirm(`Remove "${name}" from RAG store?`)) return;
+    await fetch(`${API_BASE}/api/rag-docs/${encodeURIComponent(name)}`, { method: "DELETE" });
+    loadRAGDocs();
+}
+
+document.getElementById("ragUploadForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = document.getElementById("docName").value;
+    const content = document.getElementById("docContent").value;
+    try {
+        await fetch(`${API_BASE}/api/rag-docs`, {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({name: name, content: content})
+        });
+        document.getElementById("ragUploadForm").reset();
+        loadRAGDocs();
+    } catch (e) {
+        alert("❌ Failed to upload: " + e.message);
+    }
+});
+
+// Init
+window.addEventListener("load", loadAll);
+setInterval(loadAll, 5000);
+</script>
+
+</body>
+</html>

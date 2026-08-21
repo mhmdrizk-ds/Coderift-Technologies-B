@@ -37,6 +37,7 @@ from mcp_server.tools_impl.deploy_tools import handle_deploy_to_production
 from mcp_server.tools_impl.release_tools import handle_merge_pull_request, handle_rollback_deployment
 from mcp_server.tools_impl.checks_tools import handle_run_pre_deploy_checks
 from mcp_server.tools_impl.incident_tools import handle_draft_incident_summary
+from mcp_server.tool_registry import is_tool_enabled
 
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {"name": "coderift-technologies", "version": "0.1.0"}
@@ -131,6 +132,12 @@ def handle_tools_call(conn, session: Session, params: dict) -> dict:
     progress_token = (params.get("_meta") or {}).get("progressToken")
 
     spec = TOOLS.get(name)
+    agent_name = arguments.get("_agent_name", "default")
+    if not is_tool_enabled(agent_name, name):
+        raise protocol.JSONRPCError(
+            protocol.ERR_UNAUTHORIZED,
+            f"Tool '{name}' is disabled for agent '{agent_name}'."
+        )
     if spec is None:
         raise protocol.JSONRPCError(protocol.METHOD_NOT_FOUND, f"Unknown tool '{name}'.")
 
