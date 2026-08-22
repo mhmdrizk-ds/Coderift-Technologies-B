@@ -20,6 +20,10 @@ Usage:
 
 import sys
 import uuid
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from state_graph.incident_response import make_incident_response_graph
 
@@ -32,7 +36,7 @@ def demo_normal():
     print(f"[NORMAL] Starting run: {run_id}")
     result = graph.start(run_id, {
         "incident_id": 1,
-        "repo": "billing-worker",
+        "repo": "payments-service",  # matches pr_id=1 below (see db/seed.sql)
         "pr_id": 1,
         "severity": "medium",  # NOT critical -> no HITL
     })
@@ -50,7 +54,7 @@ def demo_hitl():
     print(f"[HITL] Starting CRITICAL incident run: {run_id}")
     result = graph.start(run_id, {
         "incident_id": 1,
-        "repo": "billing-worker",
+        "repo": "payments-service",  # matches pr_id=1 below (see db/seed.sql)
         "pr_id": 1,
         "severity": "critical",  # Critical -> HITL required
     })

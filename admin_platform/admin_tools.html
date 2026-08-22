@@ -486,7 +486,14 @@
 </div>
 
 <script>
-const API_BASE = "http://localhost:8001";
+// Same-origin by design: this page is served BY admin_tools_api.py itself
+// (see the "/" route at the bottom of that file), so the API always lives
+// at the same host/port the browser already loaded this page from. A
+// hardcoded "http://localhost:8001" broke this anywhere the page isn't
+// opened via literal localhost — e.g. GitHub Codespaces / any remote dev
+// container, where the browser's "localhost" is the user's own machine,
+// not the container serving this page.
+const API_BASE = "";
 
 function getBadge(status) {
     const map = {

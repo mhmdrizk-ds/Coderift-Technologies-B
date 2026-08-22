@@ -24,8 +24,8 @@ def make_incident_response_graph(
     hitl_store: Optional[HitlStore] = None,
     ticket_store: Optional[TicketStore] = None,
 ) -> StateGraph:
-    mcp = mcp or McpAdapter()
     llm = llm or LlmClient()
+    mcp = mcp or McpAdapter(llm=llm)
 
     graph = StateGraph(GRAPH_NAME, checkpointer=checkpointer,
                          hitl_store=hitl_store, ticket_store=ticket_store)

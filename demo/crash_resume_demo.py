@@ -21,6 +21,10 @@ no re-execution on restart.
 
 import sys
 import uuid
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from state_graph.incident_response import make_incident_response_graph
 
@@ -33,7 +37,7 @@ def start_demo():
     print(f"[DEMO] Starting incident response run: {run_id}")
     result = graph.start(run_id, {
         "incident_id": 1,
-        "repo": "billing-worker",
+        "repo": "payments-service",  # matches pr_id=1 below (see db/seed.sql)
         "pr_id": 1,
         "severity": "critical",
     })
@@ -74,8 +78,7 @@ def resume_demo(run_id: str):
 
     # Show full checkpoint history
     history = graph.checkpointer.history(run_id)
-    print(f"
-[DEMO] Full checkpoint history ({len(history)} checkpoints):")
+    print(f"\n[DEMO] Full checkpoint history ({len(history)} checkpoints):")
     for i, cp in enumerate(history):
         print(f"  {i+1}. {cp.node_name} | {cp.status} | {cp.created_at}")
 

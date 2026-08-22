@@ -114,6 +114,22 @@ def delete_agent_tool(tool_id: int) -> Dict[str, Any]:
 # 2. HITL Tasks
 # ------------------------------------------------------------------
 
+def _graph_factory_for(graph_name: str):
+    """Dispatch to the right graph's factory by graph_name so the shared
+    HITL/ticket resolve endpoints below work for every graph, not just
+    incident_response. hitl_tasks/tickets both carry graph_name for
+    exactly this reason."""
+    if graph_name == "incident_response":
+        from state_graph.incident_response import make_incident_response_graph
+        return make_incident_response_graph
+    if graph_name == "security_remediation":
+        from state_graph.security_remediation import make_security_remediation_graph
+        return make_security_remediation_graph
+    raise ValueError(
+        f"No graph factory registered for graph_name='{graph_name}'."
+    )
+
+
 @app.get("/api/hitl-tasks")
 def list_hitl_tasks() -> List[Dict[str, Any]]:
     conn = _get_db_conn()
@@ -149,7 +165,7 @@ def resolve_hitl_task(task_id: int, payload: HITLResolve) -> Dict[str, Any]:
         ),
     )
     conn.commit()
-    row = conn.execute("SELECT run_id FROM hitl_tasks WHERE id = ?", (task_id,)).fetchone()
+    row = conn.execute("SELECT run_id, graph_name FROM hitl_tasks WHERE id = ?", (task_id,)).fetchone()
     conn.close()
 
     if row is None:
@@ -158,8 +174,7 @@ def resolve_hitl_task(task_id: int, payload: HITLResolve) -> Dict[str, Any]:
     run_id = row["run_id"]
 
     try:
-        from state_graph.incident_response import make_incident_response_graph
-        graph = make_incident_response_graph()
+        graph = _graph_factory_for(row["graph_name"])()
         decision = {
             "approved": payload.approved,
             "decided_by": payload.decided_by,
@@ -205,7 +220,7 @@ def resolve_ticket(ticket_id: int, payload: TicketResolve) -> Dict[str, Any]:
         (payload.note, ticket_id),
     )
     conn.commit()
-    row = conn.execute("SELECT run_id FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
+    row = conn.execute("SELECT run_id, graph_name FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
     conn.close()
 
     if row is None:
@@ -214,8 +229,7 @@ def resolve_ticket(ticket_id: int, payload: TicketResolve) -> Dict[str, Any]:
     run_id = row["run_id"]
 
     try:
-        from state_graph.incident_response import make_incident_response_graph
-        graph = make_incident_response_graph()
+        graph = _graph_factory_for(row["graph_name"])()
         result = graph.resume(run_id)
         return {"status": "ok", "ticket_id": ticket_id, "graph_result": result}
     except Exception as e:

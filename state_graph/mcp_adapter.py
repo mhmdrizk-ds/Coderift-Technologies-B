@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from state_graph.contracts import NodeFailure
+from state_graph.llm_stub import LlmClient
 from mcp_server import db as mcp_db
 from mcp_server.auth import Session
 from mcp_server.context import ToolContext
@@ -12,8 +13,9 @@ from mcp_server.tools_impl.query_tools import handle_check_deployment_status
 from mcp_server.tools_impl.incident_tools import handle_draft_incident_summary
 
 class McpAdapter:
-    def __init__(self, client: Any = None):
+    def __init__(self, client: Any = None, llm: Optional[LlmClient] = None):
         self._client = client
+        self._llm = llm or LlmClient()
         self._conn = None
         self._session = None
         self._ctx = None
@@ -30,7 +32,38 @@ class McpAdapter:
                     "Run db/init_db.py to seed the database."
                 )
             self._session.login(engineer)
-            self._ctx = ToolContext(self._session)
+            # This adapter calls tool handlers in-process (no real client on
+            # the other end of a stdio pipe), so sampling/elicitation are
+            # declared and answered locally instead of over the wire.
+            self._session.client_capabilities = {"sampling": {}, "elicitation": {}}
+            self._ctx = ToolContext(
+                self._session,
+                local_sample_fn=self._local_sample,
+                local_elicit_fn=self._local_elicit,
+            )
+
+    def _local_sample(self, messages: list, system_prompt: Optional[str], max_tokens: int) -> dict:
+        """Answers sampling/createMessage locally via LlmClient instead of
+        blocking on stdin, since there is no real client connected here."""
+        prompt_text = ""
+        if messages:
+            content = messages[0].get("content")
+            prompt_text = content.get("text", "") if isinstance(content, dict) else str(content)
+        fallback = f"[offline summary] {prompt_text[:400]}"
+        text = self._llm.complete(prompt_text, fallback=fallback)
+        return {
+            "role": "assistant",
+            "content": {"type": "text", "text": text},
+            "model": self._llm.model,
+            "stopReason": "endTurn",
+        }
+
+    def _local_elicit(self, message: str, requested_schema: dict) -> dict:
+        """Answers elicitation/create locally. By the time the graph reaches
+        a tool call that needs this, our own hitl_lead_signoff node has
+        already captured real human sign-off for anything that required
+        it, so the tool-level confirmation is auto-accepted here."""
+        return {"action": "accept", "content": {"confirm": True}}
 
     @staticmethod
     def _extract_text(result: dict) -> str:

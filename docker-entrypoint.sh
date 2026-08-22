@@ -6,15 +6,14 @@ set -e
 
 echo "=== Initializing database ==="
 python db/init_db.py
-# If you have a separate migration script for final-project tables, uncomment:
-# python db/run_migrations.py
+python db/apply_migration.py
 
 echo "=== Starting MCP HTTP Server on :8000 ==="
 python -m mcp_server.server_http --host 0.0.0.0 --port 8000 &
 MCP_PID=$!
 
 echo "=== Starting Admin Platform API on :8001 ==="
-python -m platform.admin_tools_api &
+python -m admin_platform.admin_tools_api &
 ADMIN_PID=$!
 
 echo "=== Both services running ==="

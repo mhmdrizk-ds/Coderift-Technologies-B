@@ -38,7 +38,7 @@ services:
       - rag_data:/app/resources
     environment:
       - PYTHONPATH=/app
-    command: python -m platform.admin_tools_api
+    command: python -m admin_platform.admin_tools_api
     depends_on:
       mcp_server:
         condition: service_healthy

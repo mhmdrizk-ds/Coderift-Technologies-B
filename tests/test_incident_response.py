@@ -30,6 +30,27 @@ def stores():
     )
 
 
+@pytest.fixture(autouse=True)
+def _clean_state_graph_tables():
+    """These tests intentionally run against the REAL db/coderift.db
+    (McpAdapter's real-MCP-call mode hardcodes that path via
+    mcp_server/db.py, so a per-test tmp DB isn't an option here — see
+    test_security_remediation.py for the tmp_path pattern used where it
+    IS an option). But that means checkpoints/hitl_tasks/tickets rows
+    left behind by one test (e.g. a HITL task that test never decided)
+    used to leak into the next test's hitl.list_pending() / tix.list_open()
+    assertions. Business tables (incidents, pull_requests, ...) are left
+    untouched — only the three state-graph tables get cleared."""
+    if REAL_DB_PATH.exists():
+        conn = sqlite3.connect(str(REAL_DB_PATH))
+        conn.execute("DELETE FROM checkpoints")
+        conn.execute("DELETE FROM hitl_tasks")
+        conn.execute("DELETE FROM tickets")
+        conn.commit()
+        conn.close()
+    yield
+
+
 # ---------------------------------------------------------------------------
 # Failing MCP adapter (for ticket test only — simulates real tool failure)
 # ---------------------------------------------------------------------------

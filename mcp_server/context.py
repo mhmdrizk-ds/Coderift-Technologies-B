@@ -22,9 +22,18 @@ class ClientDisconnected(Exception):
 
 
 class ToolContext:
-    def __init__(self, session, progress_token=None):
+    def __init__(self, session, progress_token=None,
+                  local_sample_fn=None, local_elicit_fn=None):
         self.session = session
         self.progress_token = progress_token
+        # Only set by in-process embedders (e.g. state_graph/mcp_adapter.py)
+        # that call tool handlers directly with no real client on the other
+        # end of a stdio pipe. When present, sample()/elicit() answer
+        # locally instead of blocking on stdin — see server_http.py's note
+        # above about why that blocking round-trip only works for a real
+        # stdio client in the first place.
+        self._local_sample_fn = local_sample_fn
+        self._local_elicit_fn = local_elicit_fn
 
     # ---- Elicitation (elicitation/create) -------------------------------
     def elicit(self, message: str, requested_schema: dict) -> dict:
@@ -47,6 +56,8 @@ class ToolContext:
                 "(elicitation), but the connected client did not declare "
                 "elicitation support during initialize.",
             )
+        if self._local_elicit_fn is not None:
+            return self._local_elicit_fn(message, requested_schema)
         req = protocol.make_request(
             "elicitation/create",
             {"message": message, "requestedSchema": requested_schema},
@@ -69,6 +80,8 @@ class ToolContext:
                 "context (sampling), but the connected client did not "
                 "declare sampling support during initialize.",
             )
+        if self._local_sample_fn is not None:
+            return self._local_sample_fn(messages, system_prompt, max_tokens)
         params = {"messages": messages, "maxTokens": max_tokens}
         if system_prompt:
             params["systemPrompt"] = system_prompt

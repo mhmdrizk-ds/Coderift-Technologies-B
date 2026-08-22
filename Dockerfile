@@ -1,6 +1,4 @@
-# Coderift Technologies — Final Project Dockerfile
-# Person A wrote this, coordinated with Person C on what needs to run.
-#
+
 # What this builds:
 #   - Python 3.11 slim image
 #   - Installs all dependencies from requirements.txt
