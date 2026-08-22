@@ -108,9 +108,18 @@ def load_and_chunk(path: Path) -> list[Document]:
 
 
 def load_all_policies() -> list[Document]:
+    """Scan DOCUMENTS_PATH for every *.md file, not just the three names in
+    POLICY_METADATA. An admin can add a new policy doc at runtime (see
+    admin_platform/admin_tools_api.py's /api/rag-docs endpoints) — if this
+    only iterated the fixed POLICY_METADATA keys, a newly uploaded file
+    would silently never be indexed, and rebuilding after an upload would
+    look successful while retrieval kept returning the old corpus. Known
+    stems keep their curated metadata (last_reviewed_date,
+    severity_applies_to); unknown stems fall back to chunk_document's
+    default metadata so they're still filterable by policy_type."""
     all_chunks = []
-    for stem in POLICY_METADATA:
-        path = DOCUMENTS_PATH / f"{stem}.md"
-        if path.exists():
-            all_chunks.extend(load_and_chunk(path))
+    if not DOCUMENTS_PATH.exists():
+        return all_chunks
+    for path in sorted(DOCUMENTS_PATH.glob("*.md")):
+        all_chunks.extend(load_and_chunk(path))
     return all_chunks

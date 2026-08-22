@@ -48,6 +48,7 @@ ERR_UNAUTHORIZED = -32002
 ERR_NOT_FOUND = -32003
 ERR_CONFLICT = -32004
 ERR_CAPABILITY_UNSUPPORTED = -32005
+ERR_TOOL_DISABLED = -32006  # tool exists but an admin disabled it for this agent
 
 
 def next_id():

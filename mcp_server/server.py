@@ -25,6 +25,7 @@ from mcp_server import protocol, db, notifications, resources, prompts, validate
 from mcp_server.auth import Session
 from mcp_server.context import ToolContext
 from mcp_server.schemas import TOOLS
+from mcp_server.tool_registry import ToolRegistry
 from mcp_server.tools_impl.session_tools import handle_authenticate
 from mcp_server.tools_impl.query_tools import (
     handle_check_deployment_status,
@@ -63,20 +64,29 @@ HANDLERS = {
     "draft_incident_summary": handle_draft_incident_summary,
 }
 
+# Single shared registry instance — ToolRegistry itself opens/closes its
+# own sqlite connection per call (same pattern as state_graph/store.py),
+# so holding one instance here is just for convenience, not caching.
+TOOL_REGISTRY = ToolRegistry()
+
 
 def _tool_visible(spec, session: Session) -> bool:
     """Whether this tool should appear in tools/list for this session
-    right now — combines role gating AND capability negotiation.
+    right now — combines role gating, capability negotiation, AND the
+    admin's per-agent tool registry (agent_tool_registrations). A tool an
+    admin has disabled for this agent must disappear from tools/list, not
+    just get rejected on tools/call — otherwise the agent (and a human
+    debugging it) has no way to discover the set of tools actually
+    available to it right now.
 
-    A tool that needs elicitation or sampling is hidden entirely from a
-    client that never declared that capability during initialize, per the
-    worked-example pattern in the assignment ("a client without
-    elicitation support gets the read-only check_deployment_status
-    fallback instead"). The handler also re-checks this (see context.py)
-    so a client that calls it anyway still gets a clean error, not a
-    crash.
+    A session with no agent_id (a direct human/engineer client, not one
+    of our state-graph agents) is not subject to this gate at all —
+    per-agent tool management is about what an *agent* can reach, not
+    about further restricting an already role-checked human user.
     """
     if spec.requires_capability and not session.supports(spec.requires_capability):
+        return False
+    if session.agent_id is not None and not TOOL_REGISTRY.is_enabled(session.agent_id, spec.name):
         return False
     if spec.roles == ():
         return True
@@ -88,6 +98,13 @@ def _tool_visible(spec, session: Session) -> bool:
 def handle_initialize(session: Session, params: dict) -> dict:
     client_capabilities = params.get("capabilities", {}) or {}
     session.client_capabilities = client_capabilities
+    # clientInfo.name identifies which agent this connection is acting
+    # as (e.g. 'security_remediation_agent'), so the admin panel's
+    # per-agent tool add/remove has something to actually gate. A plain
+    # human client with no clientInfo.name leaves session.agent_id at
+    # None and is unaffected by agent-level tool registrations.
+    client_info = params.get("clientInfo", {}) or {}
+    session.agent_id = client_info.get("name") or None
     return {
         "protocolVersion": PROTOCOL_VERSION,
         "capabilities": SERVER_CAPABILITIES,
@@ -116,6 +133,19 @@ def handle_tools_call(conn, session: Session, params: dict) -> dict:
     spec = TOOLS.get(name)
     if spec is None:
         raise protocol.JSONRPCError(protocol.METHOD_NOT_FOUND, f"Unknown tool '{name}'.")
+
+    # Per-agent tool gating enforced here too, not just in tools/list — a
+    # client can call any tool name it wants regardless of what
+    # tools/list returned (same principle auth.py's require_role() docs
+    # state for role checks). Hiding a disabled tool from the list is a
+    # UX nicety; this is what actually stops the call from running.
+    if session.agent_id is not None and not TOOL_REGISTRY.is_enabled(session.agent_id, name):
+        raise protocol.JSONRPCError(
+            protocol.ERR_TOOL_DISABLED,
+            f"Tool '{name}' has been disabled for agent '{session.agent_id}' "
+            f"by an admin. Ask an admin to re-enable it in the platform if "
+            f"this agent genuinely needs it.",
+        )
 
     # Defensive Tool Design, step 1: schema-level validation, independent
     # of whatever the handler will separately check against the database.

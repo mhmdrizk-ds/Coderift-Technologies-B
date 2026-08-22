@@ -29,6 +29,13 @@ class Session:
         self.role = None
         self.access_code = None
 
+        # Which agent this connection is acting as (e.g.
+        # 'incident_response_agent', 'security_remediation_agent') — set
+        # from the client's declared clientInfo.name during initialize.
+        # None means "not an agent connection" (e.g. a human engineer's
+        # direct client), which skips per-agent tool gating entirely.
+        self.agent_id = None
+
         # Populated during initialize() from the client's declared
         # capabilities. Used by capability negotiation (see server.py) to
         # decide which tools are even offered.
