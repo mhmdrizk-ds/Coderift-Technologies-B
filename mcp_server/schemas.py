@@ -328,5 +328,97 @@ _register(ToolSpec(
 ))
 
 
+# ---------------------------------------------------------------------------
+# set_flag_percentage — senior/lead only write tool, added alongside
+# migration 002_flag_rollout_percentage.sql. Backs the Feature Flag
+# Rollout graph's canary/auto_rollback nodes — see
+# state_graph/flag_toggle_adapter.py's ALLOWED_TOOLS whitelist, which is
+# what actually restricts a ReAct node to calling only this and
+# get_error_rate_metrics below, never an arbitrary write tool.
+# ---------------------------------------------------------------------------
+_register(ToolSpec(
+    name="set_flag_percentage",
+    description=(
+        "Set a feature flag's rollout percentage (0-100) for a repository "
+        "and environment. Sets enabled=0 automatically at 0%, enabled=1 "
+        "otherwise. This is production traffic control, same role bar as "
+        "deploy_to_production/merge_pull_request/rollback_deployment."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repository_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Repository name, e.g. 'checkout-web'.",
+            },
+            "environment_name": {
+                "type": "string",
+                "enum": ["staging", "production"],
+                "description": "Target environment.",
+            },
+            "flag_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Feature flag name, e.g. 'new-payment-retry-logic'.",
+            },
+            "rollout_pct": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Target traffic percentage for this flag.",
+            },
+        },
+        "required": ["repository_name", "environment_name", "flag_name", "rollout_pct"],
+        "additionalProperties": False,
+    },
+    roles=("senior", "lead"),
+))
+
+# ---------------------------------------------------------------------------
+# get_error_rate_metrics — read-only. Reports on whatever rollout_pct is
+# CURRENTLY live for the flag (does not take a percentage argument) —
+# real monitoring reports on live state, it doesn't take a hypothetical
+# to check. Any authenticated role may call it.
+# ---------------------------------------------------------------------------
+_register(ToolSpec(
+    name="get_error_rate_metrics",
+    description=(
+        "Read the current error-rate metrics window for a feature flag at "
+        "its currently-live rollout percentage, classified as healthy, "
+        "degraded, or error_spike against the repository's historical "
+        "baseline. Records the window for audit. Read-only with respect "
+        "to the flag itself (does not change rollout_pct)."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "repository_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Repository name, e.g. 'checkout-web'.",
+            },
+            "environment_name": {
+                "type": "string",
+                "enum": ["staging", "production"],
+                "description": "Target environment.",
+            },
+            "flag_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "description": "Feature flag name, e.g. 'new-payment-retry-logic'.",
+            },
+        },
+        "required": ["repository_name", "environment_name", "flag_name"],
+        "additionalProperties": False,
+    },
+    roles=None,
+))
+
+
 def tool_names():
     return list(TOOLS.keys())

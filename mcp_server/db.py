@@ -97,3 +97,46 @@ def get_in_flight_deployment(conn, repository_id: int, environment_id: int):
         """,
         (repository_id, environment_id),
     ).fetchone()
+
+
+def get_feature_flag(conn, repository_id: int, environment_id: int, name: str):
+    """Feature flag row for a given repo+environment+name, or None. Added
+    in migration 002 alongside `rollout_pct` — used by the flag-rollout
+    graph's flag-toggle tools (set_flag_percentage, get_error_rate_metrics)
+    the same way get_environment() backs deploy_to_production."""
+    return conn.execute(
+        """
+        SELECT id, repository_id, environment_id, name, enabled, rollout_pct
+        FROM feature_flags
+        WHERE repository_id = ? AND environment_id = ? AND name = ?
+        """,
+        (repository_id, environment_id, name),
+    ).fetchone()
+
+
+def get_historical_baseline_error_rate(conn, repository_id: int) -> float:
+    """A real, DB-derived baseline error rate for a repository, used by
+    both get_error_rate_metrics (to decide healthy/degraded/error_spike)
+    and the flag_rollout graph's LATS scoring node (to penalize aggressive
+    percentage jumps against a repo's actual incident history) — this is
+    the 'real computed heuristic, not model opinion' the project brief
+    requires for the LATS node.
+
+    Derived from the count of critical/high incidents on deployments to
+    this repository: more history of severe incidents -> a higher assumed
+    baseline error rate -> the same rollout jump looks riskier for this
+    repo than for a repo with a clean history. Floors at 0.01 (1%) so a
+    repo with zero incident history still has a nonzero baseline to
+    compare against, rather than a divide-by-zero-flavored edge case.
+    """
+    row = conn.execute(
+        """
+        SELECT COUNT(*) AS incident_count
+        FROM incidents i
+        JOIN deployments d ON d.id = i.deployment_id
+        WHERE d.repository_id = ? AND i.severity IN ('high', 'critical')
+        """,
+        (repository_id,),
+    ).fetchone()
+    incident_count = row["incident_count"] if row else 0
+    return round(0.01 + 0.015 * incident_count, 4)

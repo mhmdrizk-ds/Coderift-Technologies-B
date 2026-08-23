@@ -37,6 +37,10 @@ from mcp_server.tools_impl.deploy_tools import handle_deploy_to_production
 from mcp_server.tools_impl.release_tools import handle_merge_pull_request, handle_rollback_deployment
 from mcp_server.tools_impl.checks_tools import handle_run_pre_deploy_checks
 from mcp_server.tools_impl.incident_tools import handle_draft_incident_summary
+from mcp_server.tools_impl.flag_tools import (
+    handle_set_flag_percentage,
+    handle_get_error_rate_metrics,
+)
 
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_INFO = {"name": "coderift-technologies", "version": "0.1.0"}
@@ -62,6 +66,8 @@ HANDLERS = {
     "rollback_deployment": handle_rollback_deployment,
     "run_pre_deploy_checks": handle_run_pre_deploy_checks,
     "draft_incident_summary": handle_draft_incident_summary,
+    "set_flag_percentage": handle_set_flag_percentage,
+    "get_error_rate_metrics": handle_get_error_rate_metrics,
 }
 
 # Single shared registry instance — ToolRegistry itself opens/closes its

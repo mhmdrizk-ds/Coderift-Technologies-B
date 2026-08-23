@@ -279,6 +279,92 @@ python3 -m planning_eval.run_eval
 python3 -m pytest planning_toolkit/tests/ -v
 ```
 
+## Feature Flag Rollout & Rollback Governance (Final Project — Person C)
+
+Three real problems this graph solves, matching the same "real wait / real
+branch / real failure" shape as Person A's Incident Response graph:
+
+1. **Real wait.** A rollout percentage change doesn't show its true blast
+   radius instantly — error-rate metrics need an observation window at
+   the new traffic level. `awaiting_metrics` uses the same `WAIT_KEY`
+   pattern as `awaiting_verification`: the graph genuinely pauses and
+   waits for an external `metrics_result` event, it does not poll in a
+   loop.
+2. **Real branch.** Any step that reaches or crosses a **named
+   blast-radius threshold of 50%** (`state_graph/rollout_lats.py:
+   BLAST_RADIUS_THRESHOLD_PCT`) requires a human's sign-off before that
+   percentage is actually set — `full_production_rollout` raises
+   `Interrupt` with the flag name, repo, current %, target %, and the
+   threshold itself in the payload, the same shape `hitl_lead_signoff`
+   uses. Crucially, approval does **not** skip straight to 100%: it
+   advances exactly one step through the normal `increase_pct -> canary`
+   path, so the threshold-crossing percentage is actually canaried and
+   metrics-checked like every other step.
+3. **Real failure.** A flag-toggle tool call (`set_flag_percentage`) can
+   fail for a real infrastructure reason (timeout, malformed response).
+   `canary`/`auto_rollback` never catch this themselves —
+   `FlagToggleAdapter` raises `NodeFailure` with `error_code =
+   "FLAG_TOGGLE_TOOL_ERROR"`, which the shared `StateGraph.resume()` loop
+   turns into a ticket, exactly like `deploy_fix`. `tests/
+   test_flag_rollout.py::test_flag_toggle_tool_failure_opens_ticket_distinct_from_hitl`
+   asserts `hitl_store.list_pending()` stays empty for that run.
+
+### LATS: real numbers, not a single example
+
+`state_graph/rollout_lats.py` searches three canonical rollout-percentage
+orderings — `aggressive` `[5,25,50,100]`, `standard` `[10,30,60,100]`,
+`conservative` `[1,5,15,40,100]` — scored by `score_sequence()`, a
+deterministic function with two real, independently-computed terms:
+
+- `jump_penalty`: sum of `(step_size/100)^2 x (1 + 20 x baseline_error_rate)`
+  over consecutive steps — squaring means one big jump costs more than
+  the same distance spread over several smaller jumps, and the repo's
+  real DB-derived `baseline_error_rate` (from
+  `mcp_server/db.py:get_historical_baseline_error_rate`, itself computed
+  from actual high/critical incident counts against that repository —
+  never a guess) amplifies every jump for a repo with a rockier incident
+  history.
+- `threshold_overshoot_penalty`: +0.15 for any single step that crosses
+  the 50% blast-radius line in one jump of more than 30 percentage
+  points (e.g. `conservative`'s final `40 -> 100` step) — independent of
+  the raw jump-size penalty above.
+
+Real numbers across three repositories in the seeded database:
+
+| Repository | baseline_error_rate | aggressive | standard | conservative | Selected |
+|---|---|---|---|---|---|
+| `payments-service` | 0.01 | 0.426 | **0.36** | 0.671 | standard |
+| `billing-worker` | 0.025 (1 critical incident on record) | 0.5325 | **0.45** | 0.8013 | standard |
+| `checkout-web` | 0.01 | 0.426 | **0.36** | 0.671 | standard |
+
+`standard` wins in all three seeded cases here, but the margin narrows as
+`baseline_error_rate` rises — a repo with a worse incident history
+doesn't flip the ranking on this particular candidate set, but it does
+compress the gap, which is the real, checkable effect of the DB-grounded
+penalty term. This is a one-level tree (root + one child per named
+candidate), not an open-ended search — rollout-percentage orderings have
+a small real catalog, unlike Person A's Task 2 LATS over open-ended
+remediation actions.
+
+### Constrained ReAct: the flag-toggle whitelist
+
+`state_graph/flag_toggle_adapter.py`'s `ALLOWED_TOOLS = {"set_flag_percentage",
+"get_flag_status", "get_error_rate_metrics"}` is the only surface `canary`
+and `auto_rollback` can reach — enforced structurally in
+`FlagToggleAdapter._call()`, which raises `NodeFailure` with
+`error_code="FLAG_TOGGLE_TOOL_NOT_WHITELISTED"` for anything outside the
+set. This matters because an unconstrained ReAct loop here could toggle
+production traffic percentages in ways the graph never modeled.
+
+### `mcp_server/` — no changes to gating
+
+This branch adds two new tools (`set_flag_percentage`,
+`get_error_rate_metrics`) and their `HANDLERS` entries only. The
+per-agent tool gating in `server.py` (`_tool_visible`, `handle_tools_call`,
+`TOOL_REGISTRY`, keyed off `session.agent_id`) — already built and
+tested by Person A in `tests/test_tool_registry_enforcement.py` — is
+untouched by this branch.
+
 ## Repository layout
 
 ```
@@ -294,5 +380,7 @@ retrieval_eval/   RAG architecture comparison — see retrieval_eval/README.md
 demo/             DEMO_TRANSCRIPT.md (MCP lab, all 9 concerns) + cross_session_memory_demo.py (Session 3 flagship demo)
 planning_toolkit/ Release Readiness & Incident Remediation Planning Agent — decomposition, PS/ToT/LATS, Self-Refine/Reflexion — see planning_toolkit/README.md
 planning_eval/    Full cost/quality comparison table + fixed test suite + demo transcript for the planning agent
+state_graph/      shared engine + incident_response.py + security_remediation.py + flag_rollout.py, flag_toggle_adapter.py, rollout_lats.py
+user_platform/    the User Platform (project brief 2.3) — FastAPI backend + static chat UI, switches between all five live agents
 ```
 

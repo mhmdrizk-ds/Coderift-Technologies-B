@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Coderift Technologies — Agent Chat</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         max-width: 900px; margin: 2rem auto; padding: 0 1rem; background: #0e1116; color: #d7dde3; }
+  h1 { font-size: 1.3rem; }
+  #agent-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .agent-tab { padding: 0.5rem 0.9rem; border-radius: 6px; border: 1px solid #333;
+               background: #1a1f27; cursor: pointer; font-size: 0.85rem; }
+  .agent-tab.active { background: #2d6cdf; border-color: #2d6cdf; color: white; }
+  .agent-tab.unavailable { opacity: 0.45; cursor: not-allowed; }
+  .panel { background: #161b22; border: 1px solid #2a2f38; border-radius: 8px; padding: 1.25rem; }
+  label { display: block; margin-top: 0.75rem; font-size: 0.85rem; color: #9aa4b2; }
+  input, textarea, select { width: 100%; box-sizing: border-box; padding: 0.5rem;
+         margin-top: 0.25rem; background: #0e1116; border: 1px solid #333; border-radius: 4px; color: #d7dde3; }
+  button.primary { margin-top: 1rem; padding: 0.6rem 1.1rem; background: #2d6cdf; color: white;
+         border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+  button.secondary { margin-top: 0.5rem; margin-right: 0.5rem; padding: 0.45rem 0.8rem; background: #2a2f38;
+         color: #d7dde3; border: 1px solid #3a3f48; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+  pre { background: #0e1116; border: 1px solid #2a2f38; border-radius: 6px; padding: 0.9rem;
+        overflow-x: auto; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; }
+  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.72rem; margin-left: 0.5rem; }
+  .badge.waiting { background: #3d3416; color: #e0c04a; }
+  .badge.paused_hitl { background: #3d1e1e; color: #e07a7a; }
+  .badge.completed { background: #1e3d24; color: #7ae0a0; }
+  .badge.ticketed { background: #3d2a16; color: #e0a94a; }
+  #run-id-row { display: flex; gap: 0.5rem; align-items: center; }
+  #run-id-row input { flex: 1; }
+</style>
+</head>
+<body>
+
+<h1>Coderift Technologies — Agent Chat</h1>
+<p style="color:#9aa4b2; font-size:0.85rem;">Real backend calls only — every action here invokes the live
+graph or agent function, nothing is a canned response.</p>
+
+<div id="agent-tabs"></div>
+<div class="panel" id="agent-panel">Loading agents…</div>
+
+<script>
+const API = "";
+let agents = [];
+let currentAgent = null;
+let currentRunId = null;
+
+async function loadAgents() {
+  const res = await fetch(`${API}/agents`);
+  const data = await res.json();
+  agents = data.agents;
+  renderTabs();
+  if (agents.length) selectAgent(agents.find(a => a.available)?.agent_id || agents[0].agent_id);
+}
+
+function renderTabs() {
+  const tabs = document.getElementById("agent-tabs");
+  tabs.innerHTML = "";
+  agents.forEach(a => {
+    const el = document.createElement("div");
+    el.className = "agent-tab" + (a.agent_id === currentAgent ? " active" : "") + (!a.available ? " unavailable" : "");
+    el.textContent = a.label + (a.available ? "" : " (unavailable)");
+    el.title = a.unavailable_reason || "";
+    el.onclick = () => { if (a.available) selectAgent(a.agent_id); };
+    tabs.appendChild(el);
+  });
+}
+
+function selectAgent(agentId) {
+  currentAgent = agentId;
+  currentRunId = null;
+  renderTabs();
+  renderPanel();
+}
+
+function renderPanel() {
+  const panel = document.getElementById("agent-panel");
+  const agent = agents.find(a => a.agent_id === currentAgent);
+  if (!agent) { panel.innerHTML = ""; return; }
+
+  if (agent.kind === "state_graph") {
+    panel.innerHTML = stateGraphFormHtml(agent);
+  } else if (agent.agent_id === "memory_rag") {
+    panel.innerHTML = memoryRagFormHtml();
+  } else if (agent.agent_id === "planning") {
+    panel.innerHTML = planningFormHtml();
+  }
+}
+
+function stateGraphFormHtml(agent) {
+  const placeholder = agent.agent_id === "incident_response"
+    ? '{"incident_id": 1, "repo": "billing-worker", "deployment_id": 1, "deployment_status": "InProgress"}'
+    : '{"repo": "billing-worker", "flag_name": "new-payment-retry-logic", "environment": "production", "rollout_sequence": [10, 30, 60, 100]}';
+  return `
+    <h3>${agent.label}</h3>
+    <label>Run ID (leave blank to start a new run)</label>
+    <div id="run-id-row">
+      <input id="run-id" placeholder="auto-generated on Start" />
+    </div>
+    <label>Initial state (JSON) — used only when starting a new run</label>
+    <textarea id="initial-state" rows="3" placeholder='${placeholder}'></textarea>
+    <button class="primary" onclick="startRun()">Start run</button>
+
+    <div style="margin-top:1.25rem; border-top:1px solid #2a2f38; padding-top:1rem;">
+      <label>Resume this run with an external event or HITL decision</label>
+      <textarea id="resume-payload" rows="2" placeholder='{"metrics_result": "healthy"}  or  {"approved": true, "approver": "lead_sara"}'></textarea>
+      <button class="secondary" onclick="resumeRunEvent()">Resume: external event</button>
+      <button class="secondary" onclick="resumeRunHitl()">Resume: HITL decision</button>
+      <button class="secondary" onclick="viewHistory()">View checkpoint history</button>
+    </div>
+    <div id="result"></div>
+  `;
+}
+
+function memoryRagFormHtml() {
+  return `
+    <h3>Memory & RAG Agent</h3>
+    <label>Query</label>
+    <textarea id="rag-query" rows="2" placeholder="What's the incident response policy for a critical incident with 3 failed deployments?"></textarea>
+    <button class="primary" onclick="runMemoryRag()">Ask</button>
+    <div id="result"></div>
+  `;
+}
+
+function planningFormHtml() {
+  return `
+    <h3>Release Readiness Planning Agent</h3>
+    <label>Repository name</label>
+    <input id="plan-repo" placeholder="billing-worker" />
+    <label>Candidate pull request IDs (comma-separated)</label>
+    <input id="plan-prs" placeholder="1, 2, 3" />
+    <label>Decomposition method (leave blank to let the agent choose)</label>
+    <select id="plan-method">
+      <option value="">(auto)</option>
+      <option value="decomposition_first">decomposition_first</option>
+      <option value="dynamic_decomposition">dynamic_decomposition</option>
+    </select>
+    <button class="primary" onclick="runPlanning()">Run</button>
+    <div id="result"></div>
+  `;
+}
+
+function statusBadge(status) {
+  if (!status) return "";
+  return `<span class="badge ${status}">${status}</span>`;
+}
+
+function showResult(data) {
+  document.getElementById("result").innerHTML =
+    (data.status ? statusBadge(data.status) : "") + `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+}
+
+async function startRun() {
+  const runIdInput = document.getElementById("run-id").value.trim();
+  const runId = runIdInput || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+  let initialState;
+  try {
+    initialState = JSON.parse(document.getElementById("initial-state").value || "{}");
+  } catch (e) {
+    showResult({ error: "Initial state is not valid JSON: " + e.message });
+    return;
+  }
+  currentRunId = runId;
+  document.getElementById("run-id").value = runId;
+  const res = await fetch(`${API}/graph/start`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agent_id: currentAgent, run_id: runId, initial_state: initialState }),
+  });
+  showResult(await res.json());
+}
+
+async function resumeRunEvent() { await doResume("external_event"); }
+async function resumeRunHitl() { await doResume("hitl_decision"); }
+
+async function doResume(kind) {
+  const runId = document.getElementById("run-id").value.trim() || currentRunId;
+  if (!runId) { showResult({ error: "Start a run first, or enter a Run ID." }); return; }
+  let payload;
+  try {
+    payload = JSON.parse(document.getElementById("resume-payload").value || "{}");
+  } catch (e) {
+    showResult({ error: "Resume payload is not valid JSON: " + e.message });
+    return;
+  }
+  const body = { agent_id: currentAgent, run_id: runId };
+  body[kind] = payload;
+  const res = await fetch(`${API}/graph/resume`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  showResult(await res.json());
+}
+
+async function viewHistory() {
+  const runId = document.getElementById("run-id").value.trim() || currentRunId;
+  if (!runId) { showResult({ error: "Start a run first, or enter a Run ID." }); return; }
+  const res = await fetch(`${API}/graph/${currentAgent}/history/${runId}`);
+  showResult(await res.json());
+}
+
+async function runMemoryRag() {
+  const query = document.getElementById("rag-query").value.trim();
+  if (!query) return;
+  const res = await fetch(`${API}/agent/memory_rag/query`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query }),
+  });
+  showResult(await res.json());
+}
+
+async function runPlanning() {
+  const repo = document.getElementById("plan-repo").value.trim();
+  const prs = document.getElementById("plan-prs").value.split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+  const method = document.getElementById("plan-method").value || null;
+  const res = await fetch(`${API}/agent/planning/run`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repository_name: repo, candidate_pull_request_ids: prs, method }),
+  });
+  showResult(await res.json());
+}
+
+loadAgents();
+</script>
+</body>
+</html>
