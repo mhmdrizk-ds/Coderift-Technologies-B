@@ -34,7 +34,11 @@ from mcp_server.tools_impl.query_tools import (
     handle_list_feature_flags,
 )
 from mcp_server.tools_impl.deploy_tools import handle_deploy_to_production
-from mcp_server.tools_impl.release_tools import handle_merge_pull_request, handle_rollback_deployment
+from mcp_server.tools_impl.release_tools import (
+    handle_merge_pull_request,
+    handle_record_review_approval,
+    handle_rollback_deployment,
+)
 from mcp_server.tools_impl.checks_tools import handle_run_pre_deploy_checks
 from mcp_server.tools_impl.incident_tools import handle_draft_incident_summary
 from mcp_server.tools_impl.flag_tools import (
@@ -62,6 +66,7 @@ HANDLERS = {
     "list_active_incidents": handle_list_active_incidents,
     "list_feature_flags": handle_list_feature_flags,
     "deploy_to_production": handle_deploy_to_production,
+    "record_review_approval": handle_record_review_approval,
     "merge_pull_request": handle_merge_pull_request,
     "rollback_deployment": handle_rollback_deployment,
     "run_pre_deploy_checks": handle_run_pre_deploy_checks,

@@ -365,7 +365,107 @@ per-agent tool gating in `server.py` (`_tool_visible`, `handle_tools_call`,
 tested by Person A in `tests/test_tool_registry_enforcement.py` — is
 untouched by this branch.
 
-## Repository layout
+## Security Remediation & Admin Platform (Final Project — Person B)
+
+Three real problems this graph solves, matching the same "real wait / real
+branch / real failure" shape as Person A's Incident Response graph and
+Person C's Feature Flag Rollout graph:
+
+1. **Real wait.** After a patch brings a PR's security scan back to
+   `Passed`, code review is a genuine multi-turn wait — a human reviewer
+   may take days. `awaiting_code_review` uses the same `WAIT_KEY` pattern
+   as `awaiting_verification` / `awaiting_metrics`: the graph pauses for a
+   real external `review_result` event instead of polling.
+2. **Real branch.** Per `resources/security_review_policy.md` §4.1, only a
+   `lead`-role engineer may authorize deploying a PR whose scan is still
+   `Failed` after a patch attempt — the agent is never allowed to decide
+   this alone. `hitl_lead_signoff` raises `Interrupt` with the PR id, scan
+   status, attempt number, and the selected remediation strategy in the
+   payload. A rejected review and a rejected override are both real
+   cycles back to `propose_remediation` for a *different* strategy
+   (`attempt_number` increments, `previous_selected_id` is carried so Tree
+   of Thoughts deprioritizes whatever already failed) — not a fresh run.
+3. **Real failure.** `run_pre_deploy_checks` interrupted mid-run is a
+   named failure mode under policy §6.2 ("may leave the `security_scans`
+   table in an inconsistent state") that a silent retry cannot safely
+   paper over. `patch_pr` never catches this itself — `McpAdapter` raises
+   `NodeFailure` with `error_code = "PRE_DEPLOY_CHECKS_TOOL_ERROR"`, which
+   `StateGraph.resume()` turns into a ticket, the same shape
+   `deploy_fix`'s and `canary`'s tool failures use.
+   `tests/test_security_remediation.py::test_pre_deploy_checks_tool_failure_opens_ticket_distinct_from_hitl`
+   asserts `hitl_store.list_pending()` stays empty for that run.
+
+```
+scan_flag -> propose_remediation -> patch_pr -> [conditional on the refreshed scan]
+    Passed -> awaiting_code_review -> [conditional on reviewer]
+        approved -> deploy_patch -> resolved
+        rejected -> propose_remediation                  (real cycle #1)
+    Failed -> hitl_lead_signoff -> [conditional on the lead's decision]
+        approved -> deploy_patch_override -> resolved
+        rejected -> propose_remediation                  (real cycle #2)
+```
+
+### Tree of Thoughts: scoring more than one remediation strategy
+
+`state_graph/remediation_strategy.py::select_remediation_strategy`, called
+from `propose_remediation`, scores at least three candidate responses to a
+`Failed` scan per policy §7.3–7.4 (upgrade the dependency / patch in
+place / add a compensating control) before one is picked — a wrong first
+guess wastes a real fix window, so the candidates and the selection
+reasoning are both carried in graph state (`strategy_candidates`,
+`selected_strategy_id`, `selection_reasoning`) rather than discarded once
+a choice is made.
+
+### Constrained ReAct: the per-node tool whitelist
+
+`state_graph/security_remediation.py::ALLOWED_TOOLS_BY_NODE` restricts
+which MCP tools each node may call — `patch_pr` may only call
+`run_pre_deploy_checks`; `deploy_patch` may only call
+`record_review_approval` and `merge_pull_request`; `deploy_patch_override`
+may only call `deploy_to_production_override`. `_call_whitelisted_tool`
+enforces this in code, raising `ConstrainedToolViolation` (a distinct
+`NodeFailure` subtype) before the adapter is ever invoked if a node
+attempts a tool outside its allowlist — a real production merge/deploy
+action is too costly to leave to an unconstrained tool call.
+`tests/test_security_remediation.py::test_constrained_react_blocks_non_whitelisted_tool_call`
+proves the rejected call never reaches the adapter.
+
+### `mcp_server/` — the one new tool this branch required
+
+`merge_pull_request` only ever *read* `pull_requests.status == 'Approved'`;
+nothing could write it. `record_review_approval`
+(`mcp_server/tools_impl/release_tools.py`) is the write side of that
+check — `senior`/`lead` only, sets `status = 'Approved'` and stamps
+`reviewer_id`, registered in `schemas.py` and `server.py` alongside the
+other release tools. No other tool gating changed.
+
+### Ticket & HITL admin UI (shared across all three graphs)
+
+`admin_platform/` exposes `/api/tickets`, `/api/hitl-tasks`, and
+`/api/checkpoints` — list, filter, inspect, and resolve/decide — backed by
+the same `TicketStore`/`HitlStore`/`CheckpointStore` classes
+`incident_response.py`, `security_remediation.py`, and `flag_rollout.py`
+all share. Resolving a ticket or deciding a HITL task through this UI
+resumes the exact graph run from its last checkpoint; nothing is
+re-executed.
+
+### RAG document management (admin platform)
+
+`admin_platform/` also exposes add/remove for the RAG corpus
+(`resources/*.md` — the production deployment, security review, and
+incident response policy documents indexed by the Memory & RAG extension
+described earlier in this README). Adding or removing a document triggers a synchronous reindex, so
+the very next `naive_rag` query reflects the change — there is no stale
+window between an admin edit and the agent seeing it.
+
+### `.env` / secrets guardrail
+
+No `.env` file has ever been committed (checked across the full git
+history, not just the working tree); `.env.example` documents every
+variable name with a placeholder value only. `admin_platform/` and
+`user_platform/` were both grepped for hardcoded keys — none found.
+
+
 
 ```
 db/               schema.sql, seed.sql, ERD.mmd, init_db.py, README.md
@@ -373,8 +473,9 @@ mcp_server/       server code — see mcp_server/README.md for the concern-by-co
 resources/        Policy documents (RAG corpus) — production deployment, security review, incident response
 prompts/          draft_rollback_plan / draft_incident_postmortem (prompt templates)
 agent/            demo client (agent/README.md) + planning_client.py (planning agent CLI)
-memory/           short-term buffer, router, episodic/semantic stores, consolidation, scheduler — memory/api.py is the only import surface
-rag/              naive/hybrid/agentic/graph RAG, Self-RAG, vector store — see rag/README.md
+memory/           short-term buffer, router, episodic/semantic stores, consolidation, scheduler — memory/api.py is the only import surface — see docs/rag_memory_audit.md
+rag/              naive/hybrid/agentic/graph RAG, Self-RAG, vector store — see rag/README.md, docs/rag_memory_audit.md
+admin_platform/   ticket/HITL admin UI + RAG document management + tool registration (Person B/C) — /api/tickets, /api/hitl-tasks, /api/checkpoints, /api/rag-docs
 context_eval/     context-window pruning strategy benchmark — see context_eval/README.md
 retrieval_eval/   RAG architecture comparison — see retrieval_eval/README.md
 demo/             DEMO_TRANSCRIPT.md (MCP lab, all 9 concerns) + cross_session_memory_demo.py (Session 3 flagship demo)

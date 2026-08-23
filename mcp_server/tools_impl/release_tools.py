@@ -1,15 +1,53 @@
 """
-release_tools.py — merge_pull_request and rollback_deployment.
+release_tools.py — record_review_approval, merge_pull_request, and
+rollback_deployment.
 
-Both are senior/lead write tools with their own independent-of-schema
-business validation and their own session.require_role() call — neither
+All three are senior/lead write tools with their own independent-of-schema
+business validation and their own session.require_role() call — none
 piggybacks on deploy_to_production's checks, since a client can call
-either of these directly regardless of what tools/list happened to show.
+any of these directly regardless of what tools/list happened to show.
 """
 
 from mcp_server import db
 from mcp_server.protocol import JSONRPCError, ERR_NOT_FOUND, ERR_CONFLICT
 from mcp_server.tools_impl import text_result
+
+
+def handle_record_review_approval(conn, session, ctx, arguments: dict) -> dict:
+    """Records code-review approval for a pull request: sets status to
+    'Approved' and stamps reviewer_id with the approving engineer.
+
+    This tool did not previously exist — merge_pull_request only ever
+    read pull_requests.status, it never had a write path to set it to
+    'Approved' in the first place. Mirrors merge_pull_request's shape:
+    senior/lead only, its own independent-of-schema validation.
+    """
+    session.require_role("senior", "lead")
+
+    pull_request_id = arguments["pull_request_id"]
+    pr = db.get_pull_request(conn, pull_request_id)
+    if pr is None:
+        raise JSONRPCError(ERR_NOT_FOUND, f"No pull request #{pull_request_id} found.")
+
+    if pr["status"] == "Merged":
+        raise JSONRPCError(
+            ERR_CONFLICT,
+            f"Pull request #{pull_request_id} is already Merged; cannot record "
+            f"a review approval for it.",
+        )
+
+    conn.execute(
+        "UPDATE pull_requests SET status = 'Approved', reviewer_id = ? WHERE id = ?",
+        (session.engineer_id, pull_request_id),
+    )
+    conn.commit()
+
+    return text_result({
+        "pull_request_id": pull_request_id,
+        "status": "Approved",
+        "reviewer_id": session.engineer_id,
+        "message": f"Pull request #{pull_request_id} approved.",
+    })
 
 
 def handle_merge_pull_request(conn, session, ctx, arguments: dict) -> dict:

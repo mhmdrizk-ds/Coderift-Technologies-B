@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from state_graph.contracts import NodeFailure
-from state_graph.mcp_adapter import McpAdapter
+from state_graph.mcp_adapter import McpAdapter, SimulatedMcpClient
 from state_graph.security_remediation import (
     ConstrainedToolViolation,
     make_security_remediation_graph,
@@ -37,7 +37,7 @@ class FailingChecksMcpAdapter(McpAdapter):
     the first time it's called for a given PR."""
 
     def __init__(self):
-        super().__init__()
+        super().__init__(client=SimulatedMcpClient())
         self.fail_next_checks = True
 
     def run_pre_deploy_checks(self, pull_request_id: int) -> dict:
@@ -53,7 +53,7 @@ class FailingChecksMcpAdapter(McpAdapter):
 
 def test_clean_path_passed_scan_and_approved_review_merges(db_path):
     ckpt, hitl, tix = stores(db_path)
-    mcp = McpAdapter()
+    mcp = McpAdapter(client=SimulatedMcpClient())
     mcp.seed_pull_request(101, status="Open", scan_status="Pending")
     graph = make_security_remediation_graph(mcp=mcp, checkpointer=ckpt,
                                               hitl_store=hitl, ticket_store=tix)
@@ -82,7 +82,7 @@ def test_clean_path_passed_scan_and_approved_review_merges(db_path):
 
 def test_failed_scan_pauses_for_lead_hitl_and_resumes_on_approval(db_path):
     ckpt, hitl, tix = stores(db_path)
-    mcp = McpAdapter()
+    mcp = McpAdapter(client=SimulatedMcpClient())
     mcp.seed_pull_request(102, status="Open", scan_status="Failed")
     graph = make_security_remediation_graph(mcp=mcp, checkpointer=ckpt,
                                               hitl_store=hitl, ticket_store=tix)
@@ -117,7 +117,7 @@ def test_failed_scan_pauses_for_lead_hitl_and_resumes_on_approval(db_path):
 
 def test_hitl_rejection_loops_back_to_propose_remediation_not_a_ticket(db_path):
     ckpt, hitl, tix = stores(db_path)
-    mcp = McpAdapter()
+    mcp = McpAdapter(client=SimulatedMcpClient())
     mcp.seed_pull_request(103, status="Open", scan_status="Failed")
     graph = make_security_remediation_graph(mcp=mcp, checkpointer=ckpt,
                                               hitl_store=hitl, ticket_store=tix)
@@ -216,7 +216,7 @@ def test_crash_and_resume_no_reexecution(db_path):
     checks_calls = {"count": 0}
 
     def counting_mcp_factory():
-        adapter = McpAdapter()
+        adapter = McpAdapter(client=SimulatedMcpClient())
         adapter.seed_pull_request(105, status="Open", scan_status="Failed")
         original = adapter.run_pre_deploy_checks
         def counted(pull_request_id):
@@ -238,6 +238,10 @@ def test_crash_and_resume_no_reexecution(db_path):
     del graph_a  # "the process dies"
 
     # --- "process B" — nothing carried over except the db file ---
+    # Reset the shared counter: it's process A's own call count we just
+    # asserted above, and everything below should measure only what
+    # process B itself calls, per the assertion at the end of this test.
+    checks_calls["count"] = 0
     task = hitl.list_pending()[0]
     hitl.decide(task.id, approved=True, decided_by="lead_bob")
 

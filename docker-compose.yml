@@ -1,3 +1,6 @@
+# Coderift Technologies — Docker Compose
+# Person A wrote this, coordinated with Person C on final integration.
+#
 # Services:
 #   - mcp_server: MCP HTTP transport on port 8000
 #   - admin_platform: Admin UI + API on port 8001

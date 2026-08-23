@@ -271,6 +271,33 @@ _register(ToolSpec(
 ))
 
 # ---------------------------------------------------------------------------
+# record_review_approval — senior/lead only. Previously missing entirely:
+# merge_pull_request could read status == 'Approved' but nothing could
+# ever write it. This is the write side of that check.
+# ---------------------------------------------------------------------------
+_register(ToolSpec(
+    name="record_review_approval",
+    description=(
+        "Record code-review approval for a pull request, setting its "
+        "status to 'Approved' and stamping the approving engineer as "
+        "reviewer. Cannot approve an already-Merged pull request."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "pull_request_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "id of the pull_requests row being approved.",
+            }
+        },
+        "required": ["pull_request_id"],
+        "additionalProperties": False,
+    },
+    roles=("senior", "lead"),
+))
+
+# ---------------------------------------------------------------------------
 # merge_pull_request — senior/lead only.
 # ---------------------------------------------------------------------------
 _register(ToolSpec(

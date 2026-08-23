@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Optional
 
 from state_graph.contracts import NodeFailure
@@ -8,8 +9,16 @@ from mcp_server import db as mcp_db
 from mcp_server.auth import Session
 from mcp_server.context import ToolContext
 from mcp_server.tools_impl.deploy_tools import handle_deploy_to_production
-from mcp_server.tools_impl.release_tools import handle_rollback_deployment
-from mcp_server.tools_impl.query_tools import handle_check_deployment_status
+from mcp_server.tools_impl.release_tools import (
+    handle_merge_pull_request,
+    handle_record_review_approval,
+    handle_rollback_deployment,
+)
+from mcp_server.tools_impl.query_tools import (
+    handle_check_deployment_status,
+    handle_get_pull_request,
+)
+from mcp_server.tools_impl.checks_tools import handle_run_pre_deploy_checks
 from mcp_server.tools_impl.incident_tools import handle_draft_incident_summary
 
 class McpAdapter:
@@ -273,10 +282,28 @@ class McpAdapter:
     # this method turns into a NodeFailure/ticket, not a silent retry.
 
     def get_pull_request(self, pull_request_id: int) -> dict:
+        if self._client is not None:
+            # Simulated mode (for tests)
+            try:
+                return self._client.call(
+                    "get_pull_request", {"pull_request_id": pull_request_id}
+                )
+            except Exception as exc:
+                raise NodeFailure(
+                    "GET_PULL_REQUEST_TOOL_ERROR",
+                    f"get_pull_request failed for PR {pull_request_id}: {exc}",
+                    payload={"pull_request_id": pull_request_id},
+                ) from exc
+        # Real MCP call
+        self._ensure_real_session()
         try:
-            return self._client.call(
-                "get_pull_request", {"pull_request_id": pull_request_id}
+            result = handle_get_pull_request(
+                self._conn, self._session, self._ctx,
+                {"pull_request_id": pull_request_id}
             )
+            return json.loads(self._extract_text(result))
+        except NodeFailure:
+            raise
         except Exception as exc:
             raise NodeFailure(
                 "GET_PULL_REQUEST_TOOL_ERROR",
@@ -285,10 +312,30 @@ class McpAdapter:
             ) from exc
 
     def run_pre_deploy_checks(self, pull_request_id: int) -> dict:
+        if self._client is not None:
+            # Simulated mode (for tests)
+            try:
+                return self._client.call(
+                    "run_pre_deploy_checks", {"pull_request_id": pull_request_id}
+                )
+            except Exception as exc:
+                raise NodeFailure(
+                    "PRE_DEPLOY_CHECKS_TOOL_ERROR",
+                    f"run_pre_deploy_checks failed/interrupted for PR "
+                    f"{pull_request_id}: {exc} (policy 6.2 — may leave "
+                    f"security_scans inconsistent; do not silently retry).",
+                    payload={"pull_request_id": pull_request_id},
+                ) from exc
+        # Real MCP call
+        self._ensure_real_session()
         try:
-            return self._client.call(
-                "run_pre_deploy_checks", {"pull_request_id": pull_request_id}
+            result = handle_run_pre_deploy_checks(
+                self._conn, self._session, self._ctx,
+                {"pull_request_id": pull_request_id}
             )
+            return json.loads(self._extract_text(result))
+        except NodeFailure:
+            raise
         except Exception as exc:
             raise NodeFailure(
                 "PRE_DEPLOY_CHECKS_TOOL_ERROR",
@@ -299,10 +346,28 @@ class McpAdapter:
             ) from exc
 
     def merge_pull_request(self, pull_request_id: int) -> dict:
+        if self._client is not None:
+            # Simulated mode (for tests)
+            try:
+                return self._client.call(
+                    "merge_pull_request", {"pull_request_id": pull_request_id}
+                )
+            except Exception as exc:
+                raise NodeFailure(
+                    "MERGE_PULL_REQUEST_TOOL_ERROR",
+                    f"merge_pull_request failed for PR {pull_request_id}: {exc}",
+                    payload={"pull_request_id": pull_request_id},
+                ) from exc
+        # Real MCP call
+        self._ensure_real_session()
         try:
-            return self._client.call(
-                "merge_pull_request", {"pull_request_id": pull_request_id}
+            result = handle_merge_pull_request(
+                self._conn, self._session, self._ctx,
+                {"pull_request_id": pull_request_id}
             )
+            return json.loads(self._extract_text(result))
+        except NodeFailure:
+            raise
         except Exception as exc:
             raise NodeFailure(
                 "MERGE_PULL_REQUEST_TOOL_ERROR",
@@ -311,19 +376,34 @@ class McpAdapter:
             ) from exc
 
     def record_review_approval(self, pull_request_id: int) -> dict:
-        """No `approve_pull_request` MCP tool exists yet in mcp_server/ —
-        code review approval currently has no write path into the
-        pull_requests table at all, only merge_pull_request's read-only
-        check that status == 'Approved'. That gap is filed as its own
-        issue (mcp_server correction, not part of this graph's job).
-        Until it lands, this method is the graph's boundary: it is the
-        one place the review-approval external event is translated into
-        a call an adapter can swap for a real tool later without the
-        graph itself changing."""
+        """Real mode calls the mcp_server `record_review_approval` tool
+        (mcp_server/tools_impl/release_tools.py::handle_record_review_approval),
+        which previously did not exist — merge_pull_request could only
+        ever *read* status == 'Approved', nothing could write it. That
+        gap has been closed; this is now a real write path, not just a
+        boundary placeholder for one."""
+        if self._client is not None:
+            # Simulated mode (for tests)
+            try:
+                return self._client.call(
+                    "record_review_approval", {"pull_request_id": pull_request_id}
+                )
+            except Exception as exc:
+                raise NodeFailure(
+                    "REVIEW_APPROVAL_TOOL_ERROR",
+                    f"record_review_approval failed for PR {pull_request_id}: {exc}",
+                    payload={"pull_request_id": pull_request_id},
+                ) from exc
+        # Real MCP call
+        self._ensure_real_session()
         try:
-            return self._client.call(
-                "record_review_approval", {"pull_request_id": pull_request_id}
+            result = handle_record_review_approval(
+                self._conn, self._session, self._ctx,
+                {"pull_request_id": pull_request_id}
             )
+            return json.loads(self._extract_text(result))
+        except NodeFailure:
+            raise
         except Exception as exc:
             raise NodeFailure(
                 "REVIEW_APPROVAL_TOOL_ERROR",
@@ -337,17 +417,48 @@ class McpAdapter:
                                         confirmation_note: str) -> dict:
         """Only reachable *after* our own hitl_lead_signoff node has
         already captured a lead's approval — confirmation_note carries
-        that decision into the tool call's audit trail (policy 4.2/4.3)."""
+        that decision for our own audit trail (policy 4.2/4.3). Real mode
+        reuses handle_deploy_to_production (same tool `deploy_fix` calls) —
+        there is no separate 'override' tool on the server; the lead
+        sign-off IS the override, and the handler's own elicitation step
+        is auto-accepted locally (see _local_elicit) since that sign-off
+        already happened."""
+        if self._client is not None:
+            # Simulated mode (for tests)
+            try:
+                return self._client.call(
+                    "deploy_to_production",
+                    {
+                        "repository_name": repository_name,
+                        "environment_name": environment_name,
+                        "pull_request_id": pull_request_id,
+                        "confirmation_note": confirmation_note,
+                    },
+                )
+            except Exception as exc:
+                raise NodeFailure(
+                    "DEPLOY_OVERRIDE_TOOL_ERROR",
+                    f"deploy_to_production override failed for PR "
+                    f"{pull_request_id}: {exc}",
+                    payload={"pull_request_id": pull_request_id},
+                ) from exc
+        # Real MCP call
+        self._ensure_real_session()
         try:
-            return self._client.call(
-                "deploy_to_production",
+            result = handle_deploy_to_production(
+                self._conn, self._session, self._ctx,
                 {
                     "repository_name": repository_name,
                     "environment_name": environment_name,
                     "pull_request_id": pull_request_id,
-                    "confirmation_note": confirmation_note,
-                },
+                }
             )
+            parsed = json.loads(self._extract_text(result))
+            if isinstance(parsed, dict):
+                parsed["confirmation_note"] = confirmation_note
+            return parsed
+        except NodeFailure:
+            raise
         except Exception as exc:
             raise NodeFailure(
                 "DEPLOY_OVERRIDE_TOOL_ERROR",
