@@ -1,9 +1,6 @@
 #!/bin/bash
 # Coderift Technologies — Docker Entrypoint
-# Starts the MCP HTTP server, Admin Platform API, and User Platform in parallel.
-# Used as the image's default CMD for standalone `docker run`.
-# Under docker-compose, each service overrides this with its own `command:`
-# (see docker-compose.yml) — this script is not what runs in that path.
+# Starts both the MCP HTTP server and the Admin Platform API in parallel.
 
 set -e
 
@@ -16,7 +13,7 @@ python -m mcp_server.server_http --host 0.0.0.0 --port 8000 &
 MCP_PID=$!
 
 echo "=== Starting Admin Platform API on :8001 ==="
-python -m admin_platform.admin_tools_api &
+python -m admin_platform.admin_tools_api --host 0.0.0.0 --port 8001 &
 ADMIN_PID=$!
 
 echo "=== Starting User Platform on :8010 ==="

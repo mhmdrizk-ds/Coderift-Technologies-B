@@ -1,46 +1,22 @@
 # Coderift Technologies — Docker Compose
-# Person A wrote this, coordinated with Person C on final integration.
-# Fixed by Person C (2026-08 audit follow-up): see db-init below and the
-# added user_platform service — both were missing/broken as of the prior
-# version. Details in README's mcp_server/Docker audit section.
-#
 # Services:
-#   - db-init: one-shot job that builds + migrates db/coderift.db exactly
-#     once on the shared volume, before any long-running service starts.
-#     (Previously, DB init only happened inside docker-entrypoint.sh,
-#     which is the image's default CMD — but every service below
-#     overrides CMD with its own `command:`, so that init step never
-#     actually ran under `docker-compose up`. Splitting it into its own
-#     service, with the others depending on its clean exit, fixes that
-#     without three services racing to run db/init_db.py against a
-#     shared volume, which would let whichever starts last silently wipe
-#     out anything the others had already written.)
 #   - mcp_server: MCP HTTP transport on port 8000
 #   - admin_platform: Admin UI + API on port 8001
-#   - user_platform: chat UI + API on port 8010, switches between all
-#     five live agents (previously missing from this file entirely)
-#   - All three long-running services share the same SQLite database
-#     volume; admin_platform and mcp_server also share the RAG resources
-#     volume so an admin's document upload is visible to the same corpus
-#     the server-side RAG queries read from.
+#   - Both share the same SQLite database volume
 #
 # Usage:
 #   docker-compose up --build
-#   Then open http://localhost:8001 for the admin platform,
-#   http://localhost:8010 for the user platform (chat UI),
+#   Then open http://localhost:8001 for the admin platform
 #   and http://localhost:8000/health for the MCP server health check.
 
 version: "3.9"
 
 services:
-  db-init:
+  db_init:
     build: .
     volumes:
       - db_data:/app/db
-    environment:
-      - PYTHONPATH=/app
-    command: >
-      sh -c "python db/init_db.py && python db/apply_migration.py"
+    command: sh -c "python db/init_db.py && python db/apply_migration.py"
 
   mcp_server:
     build: .
@@ -48,17 +24,10 @@ services:
       - "8000:8000"
     volumes:
       - db_data:/app/db
-    environment:
-      - PYTHONPATH=/app
     command: python -m mcp_server.server_http --host 0.0.0.0 --port 8000
     depends_on:
-      db-init:
+      db_init:
         condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   admin_platform:
     build: .
@@ -66,15 +35,12 @@ services:
       - "8001:8001"
     volumes:
       - db_data:/app/db
-      - rag_data:/app/resources
-    environment:
-      - PYTHONPATH=/app
     command: python -m admin_platform.admin_tools_api
     depends_on:
-      db-init:
+      db_init:
         condition: service_completed_successfully
       mcp_server:
-        condition: service_healthy
+        condition: service_started
 
   user_platform:
     build: .
@@ -82,16 +48,12 @@ services:
       - "8010:8010"
     volumes:
       - db_data:/app/db
-      - rag_data:/app/resources
-    environment:
-      - PYTHONPATH=/app
     command: python -m user_platform.backend --host 0.0.0.0 --port 8010
     depends_on:
-      db-init:
+      db_init:
         condition: service_completed_successfully
       mcp_server:
-        condition: service_healthy
+        condition: service_started
 
 volumes:
   db_data:
-  rag_data:

@@ -37,11 +37,14 @@ from pathlib import Path
 import pytest
 
 from mcp_server import db as mcp_db
+from state_graph.contracts import NodeFailure
 from state_graph.mcp_adapter import McpAdapter
 from state_graph.security_remediation import make_security_remediation_graph
 from state_graph.store import CheckpointStore, HitlStore, TicketStore
 
 REAL_DB_PATH = Path(__file__).parent.parent / "db" / "coderift.db"
+
+PR_TICKET = 3  # billing-worker, Open, no scan on record
 
 PR_CLEAN = 1     # payments-service, Approved, Passed scan
 PR_FAILED = 2    # checkout-web, Approved, Failed scan
@@ -63,22 +66,29 @@ def stores():
 @pytest.fixture(autouse=True)
 def _isolate_real_db_state():
     """Clears the three state-graph tables (same as test_incident_response.py)
-    AND restores pull_requests/security_scans/deployments for the two PRs
-    these tests touch, so real-mode side effects from one test run never
-    leak into the next."""
+    AND restores pull_requests/security_scans/deployments for the PRs these
+    tests touch, so real-mode side effects from one test run never leak
+    into the next."""
+    touched_prs = (PR_CLEAN, PR_FAILED, PR_TICKET)
     conn = sqlite3.connect(str(REAL_DB_PATH))
     conn.row_factory = sqlite3.Row
 
-    def _snapshot():
-        prs = {
+    def _snapshot_prs():
+        return {
             row["id"]: dict(row)
             for row in conn.execute(
-                "SELECT * FROM pull_requests WHERE id IN (?, ?)", (PR_CLEAN, PR_FAILED)
+                f"SELECT * FROM pull_requests WHERE id IN "
+                f"({','.join('?' * len(touched_prs))})", touched_prs
             )
         }
-        return prs
 
-    before = _snapshot()
+    before_prs = _snapshot_prs()
+    before_scan_ids = {
+        row["id"] for row in conn.execute(
+            f"SELECT id FROM security_scans WHERE pull_request_id IN "
+            f"({','.join('?' * len(touched_prs))})", touched_prs
+        )
+    }
 
     yield
 
@@ -86,19 +96,23 @@ def _isolate_real_db_state():
     conn.execute("DELETE FROM hitl_tasks")
     conn.execute("DELETE FROM tickets")
     # Restore pull_requests rows this test may have mutated (status/reviewer_id).
-    for pr_id, row in before.items():
+    for pr_id, row in before_prs.items():
         conn.execute(
             "UPDATE pull_requests SET status = ?, reviewer_id = ? WHERE id = ?",
             (row["status"], row["reviewer_id"], pr_id),
         )
-    # Trim any security_scans / deployments rows these tests inserted,
-    # leaving only what db/seed.sql originally put there.
-    conn.execute(
-        "DELETE FROM security_scans WHERE pull_request_id IN (?, ?) "
-        "AND id NOT IN (SELECT MIN(id) FROM security_scans WHERE pull_request_id = ? "
-        "UNION SELECT MIN(id) FROM security_scans WHERE pull_request_id = ?)",
-        (PR_CLEAN, PR_FAILED, PR_CLEAN, PR_FAILED),
-    )
+    # Remove any security_scans rows these tests inserted that weren't there
+    # before -- handles both "kept the original scan" (PR_CLEAN, PR_FAILED)
+    # and "had no scan at all before" (PR_TICKET) correctly.
+    after_scan_ids = {
+        row["id"] for row in conn.execute(
+            f"SELECT id FROM security_scans WHERE pull_request_id IN "
+            f"({','.join('?' * len(touched_prs))})", touched_prs
+        )
+    }
+    new_scan_ids = after_scan_ids - before_scan_ids
+    for scan_id in new_scan_ids:
+        conn.execute("DELETE FROM security_scans WHERE id = ?", (scan_id,))
     conn.execute(
         "DELETE FROM deployments WHERE pull_request_id IN (?, ?) AND notes LIKE 'Lead-approved%'",
         (PR_CLEAN, PR_FAILED),
@@ -217,3 +231,78 @@ def test_real_mode_failed_scan_pauses_hitl_and_overrides():
     conn.close()
     assert dep is not None
     assert dep[0] == "Succeeded"
+
+
+# ---------------------------------------------------------------------------
+# 4. Full graph, real mode, ticket path: a mid-node tool failure opens a
+#    real ticket distinct from a HITL pause, and resumes from checkpoint
+#    once resolved -- previously unreachable in real mode (only ever
+#    proven in test_security_remediation.py's simulated-mode
+#    test_pre_deploy_checks_tool_failure_opens_ticket_distinct_from_hitl).
+# ---------------------------------------------------------------------------
+
+class _FailOnceRealAdapter(McpAdapter):
+    """Real-mode McpAdapter (client=None) that injects one interrupted
+    run_pre_deploy_checks call, mirroring policy §6.2 -- same
+    failure-injection shape test_security_remediation.py's
+    FailingChecksMcpAdapter already uses for the simulated-mode version
+    of this same test, just wired to the real handler underneath instead
+    of SimulatedMcpClient."""
+
+    def __init__(self):
+        super().__init__()  # client=None -> real mode
+        self.fail_next_checks = True
+
+    def run_pre_deploy_checks(self, pull_request_id: int) -> dict:
+        if self.fail_next_checks:
+            self.fail_next_checks = False
+            raise NodeFailure("PRE_DEPLOY_CHECKS_TOOL_ERROR", "simulated interrupted run")
+        return super().run_pre_deploy_checks(pull_request_id)
+
+
+def test_real_mode_tool_failure_opens_ticket_and_resumes_from_checkpoint():
+    ckpt, hitl, tix = stores()
+
+    graph = make_security_remediation_graph(
+        mcp=_FailOnceRealAdapter(), checkpointer=ckpt, hitl_store=hitl, ticket_store=tix
+    )
+    run_id = str(uuid.uuid4())
+
+    result = graph.start(run_id, {
+        "pull_request_id": PR_TICKET,
+        "repository_name": "billing-worker",
+        "environment_name": "production",
+    })
+
+    assert result["status"] == "ticketed"
+    assert hitl.list_pending() == []  # ticket path, not a HITL pause
+
+    tickets = tix.list_open()
+    assert len(tickets) == 1
+    ticket = tickets[0]
+    assert ticket.status == "open"
+    assert ticket.run_id == run_id
+
+    # Checkpoint exists at the point of failure -- resolving the ticket
+    # resumes from there, it does not restart patch_pr from scratch.
+    history_before = ckpt.history(run_id)
+    node_sequence_before = [c.node_name for c in history_before]
+
+    tix.set_status(ticket.id, "resolved", resolution_notes="scanner flaked, retried clean")
+
+    graph2 = make_security_remediation_graph(
+        mcp=McpAdapter(), checkpointer=CheckpointStore(REAL_DB_PATH),
+        hitl_store=HitlStore(REAL_DB_PATH), ticket_store=TicketStore(REAL_DB_PATH),
+    )
+    result2 = graph2.resume(run_id)
+
+    assert result2["status"] in ("completed", "waiting", "paused_hitl")
+    history_after = ckpt.history(run_id)
+    # Every step recorded before the crash is still there, untouched --
+    # resume picked up after the checkpoint, it didn't re-run from node 1.
+    assert [c.node_name for c in history_after][:len(node_sequence_before)] == node_sequence_before
+
+    conn = mcp_db.get_connection()
+    pr = mcp_db.get_pull_request(conn, PR_TICKET)
+    conn.close()
+    assert pr is not None  # sanity: real DB, real row, untouched by the injected failure

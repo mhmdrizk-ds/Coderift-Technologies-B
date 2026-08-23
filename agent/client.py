@@ -23,9 +23,16 @@ def load_test_inputs():
 def rebuild_database():
     """Run db/init_db.py so every full demo run starts from the same fixed
     seed state — no reliance on lucky random data or leftover writes from
-    a previous run."""
+    a previous run. Also re-applies db/migrations/ (state-graph and
+    admin-tooling tables): init_db.py only builds the original 8-table
+    schema, and without this second step any final-project demo run
+    right after `--all` hits `sqlite3.OperationalError: no such table:
+    checkpoints` — this is the README's own documented setup flow, so a
+    grader following it top-to-bottom would otherwise hit that wall."""
     print(">>> Rebuilding database from db/schema.sql + db/seed.sql ...")
     subprocess.run([sys.executable, str(PROJECT_ROOT / "db" / "init_db.py")], check=True)
+    print(">>> Applying db/migrations/ (state-graph + admin-tooling tables) ...")
+    subprocess.run([sys.executable, str(PROJECT_ROOT / "db" / "apply_migration.py")], check=True)
 
 
 def reset_semantic_memory():

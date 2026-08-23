@@ -21,7 +21,8 @@ import sys
 from pathlib import Path
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
-DEFAULT_DB_PATH = Path(__file__).parent / "coderift.db"
+# Same db/data/ subdirectory as init_db.py -- see its comment for why.
+DEFAULT_DB_PATH = Path(__file__).parent / "data" / "coderift.db"
 
 
 def apply_migrations(db_path: Path) -> None:

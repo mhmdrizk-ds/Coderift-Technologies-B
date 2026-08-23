@@ -13,7 +13,9 @@ import sqlite3
 from pathlib import Path
 from typing import Dict, List, Set
 
-DB_PATH = Path(__file__).resolve().parent.parent / "db" / "coderift.db"
+# db/data/ subdirectory, not db/ directly -- see db/init_db.py's comment:
+# Docker named volumes can't reliably mount onto a single file path.
+DB_PATH = Path(__file__).resolve().parent.parent / "db" / "data" / "coderift.db"
 
 # In-memory cache
 _registry: Dict[str, Set[str]] = {}

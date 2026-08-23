@@ -7,7 +7,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-DEFAULT_DB_PATH = Path(__file__).parent.parent / "db" / "coderift.db"
+# db/data/ subdirectory, not db/ directly -- see db/init_db.py's comment:
+# Docker named volumes can't reliably mount onto a single file path.
+DEFAULT_DB_PATH = Path(__file__).parent.parent / "db" / "data" / "coderift.db"
 
 
 def _now() -> str:

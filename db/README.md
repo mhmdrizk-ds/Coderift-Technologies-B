@@ -30,6 +30,6 @@ integrity a grader would expect from the ERD.
 python db/init_db.py
 ```
 
-This creates `db/coderift.db`. Re-running it drops and rebuilds from
+This creates `db/data/coderift.db`. Re-running it drops and rebuilds from
 scratch, so the demo scenarios always start from the same fixed state —
 no reliance on lucky random data.

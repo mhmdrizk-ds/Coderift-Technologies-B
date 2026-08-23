@@ -15,7 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-DB_PATH = Path(__file__).resolve().parent.parent / "db" / "coderift.db"
+# db/data/ subdirectory, not db/ directly -- see db/init_db.py's comment:
+# Docker named volumes can't reliably mount onto a single file path.
+DB_PATH = Path(__file__).resolve().parent.parent / "db" / "data" / "coderift.db"
 RAG_RESOURCES_DIR = Path(__file__).resolve().parent.parent / "resources"
 
 # rag/vector_store's own modules do `from config import ...` (relative,

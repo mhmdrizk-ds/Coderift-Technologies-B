@@ -13,7 +13,7 @@ python -m mcp_server.server          # stdio transport
 python -m mcp_server.server_http     # Streamable HTTP transport, :8000
 ```
 
-It expects the database at `db/coderift.db` to already exist
+It expects the database at `db/data/coderift.db` to already exist
 (`python db/init_db.py` first if not).
 
 ## Where each protocol concern lives

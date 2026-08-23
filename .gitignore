@@ -20,8 +20,11 @@ env/
 !.env.example
 
 # The built database is generated from db/schema.sql + db/seed.sql — do not
-# commit the binary artifact, only the SQL that produces it.
-db/coderift.db
+# commit the binary artifact, only the SQL that produces it. Lives in its
+# own db/data/ subdirectory so Docker can mount a named volume onto that
+# whole directory instead of onto the single file (see docker-compose.yml).
+db/data/coderift.db
+db/data/
 
 # Same reasoning for generated/session-local memory & RAG artifacts that
 # are pure runtime state (rebuildable from source, or specific to one

@@ -55,41 +55,13 @@ quick orientation.)
 
 ```bash
 pip install -r requirements.txt      # only needed for the HTTP transport
-python db/init_db.py                 # builds db/coderift.db from schema+seed
-python db/apply_migration.py         # adds the final-project tables (checkpoints, hitl_tasks, tickets, ...)
+python db/init_db.py                 # builds db/data/coderift.db from schema+seed
 python -m agent.client --all         # runs all 10 demo scenarios, stdio transport
 ```
-
-**Note:** `agent.client --all` rebuilds `db/coderift.db` from scratch
-before running (`rebuild_database()` in `agent/client.py`, "so every
-full demo run starts from the same fixed seed"), and that rebuild only
-runs `init_db.py` — it does not re-apply migrations. If you run any
-final-project demo (`demo/incident_response_demo.py`,
-`demo/crash_resume_demo.py`, the admin/user platforms, etc.) after
-running `agent.client --all`, re-run `python db/apply_migration.py`
-first, or you'll hit `sqlite3.OperationalError: no such table:
-checkpoints`. This is a real, reproducible gap between the original
-MCP-lab demo runner and the final-project schema — flagged here rather
-than silently worked around, since fixing `rebuild_database()` itself
-belongs to whoever owns `agent/client.py`'s scope.
 
 `python -m mcp_server.server_http --port 8000` runs the Streamable HTTP
 transport separately (see `mcp_server/server_http.py` and
 `db/README.md` / `mcp_server/README.md` for details).
-
-For Docker: `docker-compose up --build` starts all three services
-(`mcp_server`, `admin_platform`, `user_platform`) behind a one-shot
-`db-init` step that builds and migrates the database exactly once on
-the shared volume before anything else starts. Once the stack is up,
-`python scripts/docker_integration_test.py` drives a full check against
-the live containers — MCP protocol round trip, all five agents reachable
-through the user platform, a complete `flag_rollout` run through HITL
-over real HTTP, a real RAG answer through the platform, and the
-`planning_toolkit` env-var regression re-verified specifically inside
-the running container via `docker-compose exec`. See that script's
-module docstring for exactly what each check does and does not prove;
-it currently reports one expected failure (flag_rollout's simulated vs.
-real MCP client gap, documented above) by design, not by accident.
 
 ## The 9 protocol concerns, tied to a specific tool/trigger
 
@@ -307,6 +279,74 @@ python3 -m planning_eval.run_eval
 python3 -m pytest planning_toolkit/tests/ -v
 ```
 
+## Incident Response & Admin Tool Registry (Final Project — Person A)
+
+Three real problems this graph solves — the same "real wait / real
+branch / real failure" shape Person B's Security Remediation graph and
+Person C's Feature Flag Rollout graph both follow, and the shape the
+other two sections below borrow their framing from:
+
+1. **Real wait.** Deploying a fix doesn't prove an incident is over —
+   whether the fix actually held needs a real observation window after
+   deployment. `awaiting_verification` uses the same `WAIT_KEY` pattern
+   as `awaiting_code_review` / `awaiting_metrics`: the graph genuinely
+   pauses for an external `verification_result` event rather than
+   polling for it.
+2. **Real branch.** Per policy, a fix for a **critical**-severity
+   incident may not go to production on the agent's own authority —
+   `hitl_lead_signoff` raises `Interrupt` with the incident id, severity,
+   proposed fix, and its runbook citations in the payload, and only a
+   non-`critical` incident skips this gate automatically
+   (`hitl_required: False`). A rejected sign-off is a real cycle back to
+   `awaiting_diagnosis`, not a dead end — the next pass re-decomposes and
+   re-proposes rather than repeating the same rejected fix.
+3. **Real failure and a real second cycle.** If `awaiting_verification`
+   comes back `unhealthy` — the deployed fix didn't actually resolve the
+   incident — `reopened` is a distinct cycle back to `awaiting_diagnosis`
+   from the HITL-rejection cycle above: it clears `verification_result`
+   and `fix_deployed` so a fresh fix gets diagnosed, proposed, signed off,
+   and deployed again, tracking `reopen_count` across however many
+   passes that takes. Separately, `deploy_fix`'s own tool call failing
+   outright (not "deployed but didn't work" — the deploy itself erroring)
+   is caught by `McpAdapter` and turned into a ticket by
+   `StateGraph.resume()`, the same shape `patch_pr`'s and `canary`'s tool
+   failures use.
+
+```
+triage -> awaiting_diagnosis -> propose_fix -> hitl_lead_signoff -> [conditional]
+                  ▲                                                approved -> deploy_fix -> awaiting_verification -> [conditional]
+                  │                                                                                    healthy -> resolved
+                  │ rejected                                                                            unhealthy -> reopened ──┐
+                  └──────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Task decomposition: building the remediation step sequence
+
+`awaiting_diagnosis` calls `state_graph/incident_decomposition.py::decompose_remediation`
+against the real incident facts (severity, deployment id/status,
+repository) pulled from `mcp.draft_incident_summary`, not a canned list —
+a critical incident's remediation steps genuinely depend on which service
+failed and what it was mid-deploying when it did.
+
+### RAG: grounding the proposed fix in the actual runbooks
+
+`propose_fix` calls `state_graph/rag_lookup.py::lookup_runbook_guidance`
+against the same policy corpus indexed by the Memory & RAG extension
+above — the proposed fix carries real `runbook_citations`, not the
+model's own recollection of what the incident-response policy says, and
+those citations travel with the fix into the `hitl_lead_signoff` payload
+so the approving lead can check the reasoning, not just the conclusion.
+
+### `mcp_server/` — admin platform's tool registry (runtime gating, not a redeploy)
+
+`admin_platform/`'s `/api/agent-tools` (list/register/toggle/de-register)
+is backed by a real `agent_tool_registrations` table and reaches
+`server.py`'s actual per-agent gating (`_tool_visible`,
+`handle_tools_call`, keyed off `session.agent_id`) — a toggle in the
+admin UI changes what an agent can call on its very next `tools/list`,
+with no redeploy in between. `tests/test_tool_registry_enforcement.py`
+(6/6) proves this reaches the real gating path, not a UI-only flag.
+
 ## Feature Flag Rollout & Rollback Governance (Final Project — Person C)
 
 Three real problems this graph solves, matching the same "real wait / real
@@ -495,82 +535,6 @@ variable name with a placeholder value only. `admin_platform/` and
 
 
 
-## `mcp_server/` audit (Final Project — Person C)
-
-The final-project brief calls this "load-bearing infrastructure — no
-partial credit for new work sitting next to a broken server," so this is
-a fresh audit run directly against a live server (`server_http.py` on a
-loopback port), not a re-statement of the original MCP Server Lab
-feedback. Every finding below was reproduced with a real JSON-RPC call
-over real HTTP, shown alongside what was checked so it can be re-run.
-
-**Capability negotiation, role gating, and runtime tool
-register/de-register all work correctly end-to-end over HTTP.** Checked
-by declaring `elicitation`+`sampling` in `initialize`, authenticating as
-a senior engineer, and calling `tools/list` in the same batched request —
-all 12 role/capability-appropriate tools appeared, including
-`deploy_to_production` and `draft_incident_summary`. Runtime
-de-registration was checked by disabling `rollback_deployment` for one
-agent via `ToolRegistry.deregister()` and confirming, over the same live
-server, that the tool both disappeared from that agent's `tools/list`
-*and* a direct `tools/call` for it was rejected with a clean error — not
-silently allowed through. This matches what
-`tests/test_tool_registry_enforcement.py` already covers (6/6 passing);
-this audit re-confirmed it live rather than trusting the tests alone.
-
-**Authorization is re-checked in the handler against a fresh DB read, not
-just at login.** Checked by authenticating a session as a senior
-engineer, then flipping that engineer's `active` flag to 0 directly in
-the database mid-session (simulating an admin revoking access without
-the client's session object knowing), then calling
-`deploy_to_production` on the same session. The call was correctly
-rejected — the handler re-fetches the engineer record rather than
-trusting the cached session role — confirming this isn't a login-time-only
-check.
-
-**Elicitation gating on `deploy_to_production` is correctly conditional
-and correctly enforced when it does apply.** A clean, already-approved,
-already-passing-scan deploy to staging succeeds with no elicitation
-required, exactly as designed — that's not a gap, it's the intended
-"skip the human step when nothing's actually risky" path. Deploying a PR
-with a pending security scan to *production* (which does need
-confirmation) with no `elicitation` capability declared correctly
-returns a clean `-32005` `ERR_CAPABILITY_UNSUPPORTED` error rather than
-either crashing or silently deploying anyway.
-
-**Finding: `notifications/progress` and `notifications/tools/list_changed`
-are not actually delivered to the client over the HTTP transport.**
-`protocol.send_message()` (used by both `ToolContext.report_progress()`
-and `notifications.send_tools_list_changed()`) writes unconditionally to
-`sys.stdout` — correct for the stdio transport, where stdout *is* the
-client's input stream, but over HTTP that's the server process's own
-log, not the HTTP response. Reproduced by calling `run_pre_deploy_checks`
-(which fires 3 progress notifications) with a `progressToken` over HTTP:
-the final tool result came back correctly in the HTTP response, but all
-three progress notifications, plus the `tools/list_changed` notification
-from the preceding `authenticate` call, only ever appeared in the
-server's own stdout log — never reached the client. This is a real gap
-in the Notifications / Progress Tracking protocol concerns specifically
-for the HTTP transport; both work correctly over stdio, which is what
-`agent/client.py`'s demo scenarios exercise, so the existing 12/12 clean
-demo run doesn't surface it. `server_http.py`'s docstring already flags
-the same root cause for elicitation/sampling (per-request sessions can't
-hold a blocking round-trip open); this is the same limitation showing up
-for the two fire-and-forget notification types instead. Not fixed as
-part of this pass — fixing it properly means giving the HTTP transport a
-way to stream or queue notifications per-session (e.g. an SSE channel or
-an in-memory per-session outbox the client polls), which is a transport
-design change, not a one-line patch, so it's recorded here rather than
-patched hastily.
-
-**Conclusion:** the server's actual gating logic — capability checks,
-role checks, tool registry enforcement, handler-level re-authorization —
-is sound and verified live. The one real gap found is scoped and
-specific (notification delivery over HTTP only), not a symptom of
-broken core mechanics.
-
-## Repository layout
-
 ```
 db/               schema.sql, seed.sql, ERD.mmd, init_db.py, README.md
 mcp_server/       server code — see mcp_server/README.md for the concern-by-concern index
@@ -588,3 +552,4 @@ planning_eval/    Full cost/quality comparison table + fixed test suite + demo t
 state_graph/      shared engine + incident_response.py + security_remediation.py + flag_rollout.py, flag_toggle_adapter.py, rollout_lats.py
 user_platform/    the User Platform (project brief 2.3) — FastAPI backend + static chat UI, switches between all five live agents
 ```
+

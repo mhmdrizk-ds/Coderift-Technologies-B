@@ -11,7 +11,9 @@ scan) used by more than one tool.
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "db" / "coderift.db"
+# db/data/ subdirectory, not db/ directly -- see db/init_db.py's comment:
+# Docker named volumes can't reliably mount onto a single file path.
+DB_PATH = Path(__file__).resolve().parent.parent / "db" / "data" / "coderift.db"
 
 
 def get_connection() -> sqlite3.Connection:
