@@ -22,8 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Initialize the database (original schema + seed)
-# If you have a separate migration for final-project tables, add it here too.
 RUN python db/init_db.py
+RUN python db/apply_migration.py
 
 # Expose both service ports
 EXPOSE 8000 8001
