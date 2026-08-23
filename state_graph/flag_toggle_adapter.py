@@ -14,7 +14,6 @@ from state_graph.contracts import NodeFailure
 # that could reach outside this set.
 ALLOWED_TOOLS = frozenset({
     "set_flag_percentage",
-    "get_flag_status",
     "get_error_rate_metrics",
 })
 
@@ -68,13 +67,7 @@ class FlagToggleAdapter:
             "rollout_pct": rollout_pct,
         })
 
-    def get_flag_status(self, repo: str, environment: str, flag_name: str) -> dict:
-        return self._call("get_flag_status", {
-            "repository_name": repo,
-            "environment_name": environment,
-            "flag_name": flag_name,
-        })
-
+   
     def get_error_rate_metrics(self, repo: str, environment: str, flag_name: str) -> dict:
         return self._call("get_error_rate_metrics", {
             "repository_name": repo,
@@ -122,8 +115,6 @@ class SimulatedFlagToggleClient:
                 "previous_rollout_pct": previous,
             }
 
-        if tool_name == "get_flag_status":
-            return {"flag_name": args["flag_name"], "rollout_pct": self._flags.get(key, 0)}
 
         if tool_name == "get_error_rate_metrics":
             if self.fail_next_metrics:

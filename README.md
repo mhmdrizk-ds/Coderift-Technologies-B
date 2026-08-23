@@ -349,7 +349,7 @@ remediation actions.
 ### Constrained ReAct: the flag-toggle whitelist
 
 `state_graph/flag_toggle_adapter.py`'s `ALLOWED_TOOLS = {"set_flag_percentage",
-"get_flag_status", "get_error_rate_metrics"}` is the only surface `canary`
+"get_error_rate_metrics"}` is the only surface `canary`
 and `auto_rollback` can reach — enforced structurally in
 `FlagToggleAdapter._call()`, which raises `NodeFailure` with
 `error_code="FLAG_TOGGLE_TOOL_NOT_WHITELISTED"` for anything outside the
