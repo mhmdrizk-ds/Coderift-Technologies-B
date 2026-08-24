@@ -21,8 +21,8 @@ pytest>=8.0               # memory/tests/
 # Optional, not required for the pipeline to run (falls back to a
 # deterministic offline TF-IDF embedder if unavailable — see
 # rag/vector_store/embeddings.py):
-sentence-transformers>=3.0
-langchain-huggingface>=0.1
+#sentence-transformers>=3.0
+#langchain-huggingface>=0.1
 
 
 # Task 1 — Grounded Environment + Decomposition-First + Plan-and-Solve + Self-Refine

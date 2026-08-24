@@ -42,7 +42,7 @@ from state_graph.mcp_adapter import McpAdapter
 from state_graph.security_remediation import make_security_remediation_graph
 from state_graph.store import CheckpointStore, HitlStore, TicketStore
 
-REAL_DB_PATH = Path(__file__).parent.parent / "db" / "coderift.db"
+REAL_DB_PATH = Path(__file__).parent.parent / "db" / "data" / "coderift.db"
 
 PR_TICKET = 3  # billing-worker, Open, no scan on record
 

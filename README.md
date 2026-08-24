@@ -56,6 +56,9 @@ quick orientation.)
 ```bash
 pip install -r requirements.txt      # only needed for the HTTP transport
 python db/init_db.py                 # builds db/data/coderift.db from schema+seed
+python db/apply_migration.py         # adds checkpoints/hitl_tasks/tickets/agent_tool_registrations
+                                      # — required before running any state_graph/, admin_platform/,
+                                      # or user_platform/ code, including demo/crash_resume_demo.py
 python -m agent.client --all         # runs all 10 demo scenarios, stdio transport
 ```
 

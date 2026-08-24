@@ -19,7 +19,14 @@ import sqlite3
 from pathlib import Path
 from typing import List, Optional
 
-DB_PATH = Path(__file__).resolve().parent.parent / "db" / "coderift.db"
+# db/data/ subdirectory, not db/ directly -- must match db/init_db.py,
+# state_graph/store.py, and admin_platform/admin_tools_api.py exactly.
+# (Previously pointed at db/coderift.db, a path nothing else in this repo
+# ever wrote to -- sqlite3.connect() silently created an empty file there,
+# and is_enabled()'s OperationalError fallback made every check fail open,
+# so an admin's tool toggle in admin_platform never reached the live
+# server. Fixed as part of the Final Project's admin-platform correction.)
+DB_PATH = Path(__file__).resolve().parent.parent / "db" / "data" / "coderift.db"
 
 
 class ToolRegistry:

@@ -14,7 +14,7 @@ from state_graph.store import CheckpointStore, HitlStore, TicketStore
 # Real database path (NOT a temp DB — uses your actual seeded db/coderift.db)
 # ---------------------------------------------------------------------------
 
-REAL_DB_PATH = Path(__file__).parent.parent / "db" / "coderift.db"
+REAL_DB_PATH = Path(__file__).parent.parent / "db" / "data" / "coderift.db"
 
 def stores():
     """Return store instances pointing to the REAL database."""

@@ -80,6 +80,19 @@ HANDLERS = {
 # so holding one instance here is just for convenience, not caching.
 TOOL_REGISTRY = ToolRegistry()
 
+# Fail loudly instead of silently: if this db file doesn't exist yet,
+# sqlite3.connect() would otherwise create an empty one with no
+# agent_tool_registrations table, and ToolRegistry.is_enabled()'s
+# OperationalError fallback would make every gating check fail open —
+# an admin's tool toggle would then never reach this server and nobody
+# would notice. This exact bug shipped once; this assertion is here so
+# it can't ship again unnoticed.
+assert TOOL_REGISTRY.db_path.exists(), (
+    f"TOOL_REGISTRY is pointed at {TOOL_REGISTRY.db_path}, which doesn't "
+    "exist yet. Run `python db/init_db.py` then `python db/apply_migration.py` "
+    "before starting the server."
+)
+
 
 def _tool_visible(spec, session: Session) -> bool:
     """Whether this tool should appear in tools/list for this session

@@ -59,6 +59,28 @@ def agent_session(agent_id: str) -> Session:
     return session
 
 
+def test_default_tool_registry_points_at_the_real_shared_db():
+    """Every other store in this project (CheckpointStore, HitlStore,
+    TicketStore, admin_platform's own DB_PATH, db/init_db.py) reads and
+    writes db/data/coderift.db. server.py's module-level TOOL_REGISTRY
+    must point at that exact same file — not a different path that
+    sqlite3.connect() would silently create as an empty db with no
+    agent_tool_registrations table, which would make is_enabled() fail
+    open on every check and make admin_platform's toggle a no-op against
+    the live server. This test deliberately does NOT monkeypatch
+    server.TOOL_REGISTRY, unlike every other test in this file — it is
+    the one place that would have caught the real (pre-fix) production
+    wiring bug, since that bug only ever showed up in the un-patched
+    default, not in any of the tmp_path-scoped fixtures above.
+    """
+    expected = Path(__file__).resolve().parent.parent / "db" / "data" / "coderift.db"
+    assert server.TOOL_REGISTRY.db_path == expected
+    assert server.TOOL_REGISTRY.db_path.exists(), (
+        "server.TOOL_REGISTRY.db_path does not exist — run "
+        "`python db/init_db.py` and `python db/apply_migration.py` first."
+    )
+
+
 def test_agent_session_gets_agent_id_from_client_info():
     session = agent_session("security_remediation_agent")
     assert session.agent_id == "security_remediation_agent"
